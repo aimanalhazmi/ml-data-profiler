@@ -1,4 +1,4 @@
-# 🧠 ML Data Profiler
+# ML Data Profiler
 
 A Python library for **profiling**, **quality assessment**, **AutoML performance evaluation**, and **fairness analysis** of datasets from machine learning repositories like **OpenML**, **Kaggle**, and **Hugging Face**.
 
