@@ -14,6 +14,23 @@ A Python library for **profiling**, **quality assessment**, **AutoML performance
 
 ---
 
+## 🔧 Project Structure
+
+```
+ml_data_profiler/
+├── ingestion/         # Dataset download and preprocessing
+├── profiling/         # Data quality analysis (missing values, outliers, etc.)
+├── automl/            # AutoML training & evaluation module
+├── fairness/          # Fairness metrics and bias detection
+├── reports/           # Report generation (Plots, summary)
+├── utils/             # Shared helper functions
+├── main.py            # Runs the full pipeline
+├── requirements.txt   # Python dependencies
+└── Makefile           # Build and setup commands
+```
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Clone the repository
@@ -56,24 +73,6 @@ You can now select **ml-data-profiler** as a kernel in Jupyter Notebook/Lab.
 
 
 ---
-
-## 🔧 Project Structure
-
-```
-ml_data_profiler/
-├── ingestion/         # Dataset download and preprocessing
-├── profiling/         # Data quality analysis (missing values, outliers, etc.)
-├── automl/            # AutoML training & evaluation module
-├── fairness/          # Fairness metrics and bias detection
-├── reports/           # Report generation (Plots, summary)
-├── utils/             # Shared helper functions
-├── main.py            # Runs the full pipeline
-├── requirements.txt   # Python dependencies
-└── Makefile           # Build and setup commands
-```
-
----
-
 
 ## 📈 Example Usage (after setup)
 
