@@ -79,12 +79,18 @@ You can now select **ml-data-profiler** as a kernel in Jupyter Notebook/Lab.
 ```bash
 python main.py
 ```
+
+To get Influence(with Logistic Regression):
+```
+influencer = LogisticInfluence(mode, X_train, y_train)
+influences = Influencer.get_influence(X_test[0], y_test[0])
+```
 ---
 
 ## 👥 Contributors
 
 - **Aiman Al-Hazmi** 
-- **2** 
+- **Letian Wang** 
 - **3**  
 - **4**
 
