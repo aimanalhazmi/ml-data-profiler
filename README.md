@@ -1,32 +1,44 @@
-# ML Data Profiler
+# Fairfluence
 
-A Python library for **profiling**, **quality assessment**, **AutoML performance evaluation**, and **fairness analysis** of datasets from machine learning repositories like **OpenML**, **Kaggle**, and **Hugging Face**.
+A Python library for **profiling**, **influence-based quality assessment**, **AutoML performance evaluation**, and **fairness analysis** of tabular datasets from machine learning repositories like **OpenML**, **Kaggle**, and **Hugging Face**.
+
+**Fairfluence** goes beyond standard profiling by training a model and using influence functions to identify which data points most affect the model’s predictions. This allows for precise fairness debugging and targeted quality analysis.
 
 ---
 
 ## 📦 Features
 
-- Automatic data profiling: missing values, imbalance, outliers, constant/correlated columns
-- AutoML support with performance metrics
-- Fairness analysis using sensitive attributes
-- Visual report generation for each dataset
-- Works with dataset URLs from OpenML, Hugging Face, and Kaggle
+- Dataset ingestion from OpenML, Kaggle, Hugging Face
+- Automatic profiling: missing values, outliers, imbalance, redundant features
+- Model training and **influence score computation** per data point
+- **Data quality checks** via PyOD, focused on high-influence records
+- **Fairness analysis** using Fairlearn and sensitive attributes
+- AutoML evaluation for performance analysis
+- Visual report generation summarizing influence, quality, fairness, and performance
 
 ---
 
 ## 🔧 Project Structure
 
 ```
-ml_data_profiler/
-├── ingestion/         # Dataset download and preprocessing
-├── profiling/         # Data quality analysis (missing values, outliers, etc.)
-├── automl/            # AutoML training & evaluation module
-├── fairness/          # Fairness metrics and bias detection
-├── reports/           # Report generation (Plots, summary)
-├── utils/             # Shared helper functions
-├── main.py            # Runs the full pipeline
-├── requirements.txt   # Python dependencies
-└── Makefile           # Build and setup commands
+fairfluence/
+├── data/                   # Downloaded datasets and local CSVs
+├── notebooks/              # Exploratory notebooks for analysis & prototyping
+├── src/
+│   ├── ingestion/          # Dataset loaders (OpenML, Kaggle, HF)
+│   ├── model/              # Model training utilities (e.g., train_model.py)
+│   ├── influence/          # Influence score computation
+│   ├── quality/            # Data quality assessment logic
+│   ├── fairness/           # Fairness analysis and bias detection
+│   ├── automl/             # Integration with automated ML workflows
+│   ├── reports/            # Visual and text-based reporting utilities
+│   ├── utils/              # Shared helper functions (logging, configuration, report generation)
+│   └── main.py             # End-to-end CLI script to run the full pipeline
+├── outputs/                # Generated reports, scores, visualizations
+├── tests/                  # Unit tests for individual modules
+├── requirements.txt        # Project dependencies
+├── Makefile                # Build and setup commands
+└── README.md               # Project documentation
 ```
 
 ---
@@ -35,8 +47,8 @@ ml_data_profiler/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/aimanalhazmi/ml-data-profiler.git
-cd ml-data-profiler
+git clone https://github.com/aimanalhazmi/fairfluence.git
+cd fairfluence
 ```
 
 ### 2. Set up the environment using `make`
@@ -58,7 +70,7 @@ source .venv/bin/activate
 make jupyter-kernel
 ```
 
-You can now select **ml-data-profiler** as a kernel in Jupyter Notebook/Lab.
+You can now select **fairfluence** as a kernel in Jupyter Notebook/Lab.
 
 
 ## ⚙️ Makefile Commands
@@ -67,7 +79,7 @@ You can now select **ml-data-profiler** as a kernel in Jupyter Notebook/Lab.
 |---------------------|------------------------------------------------------------|
 | `make install`      | Set up virtual environment and install dependencies        |
 | `make activate`     | Print the command to activate the environment              |
-| `make jupyter-kernel` | Register Jupyter kernel as `ml-data-profiler`          |
+| `make jupyter-kernel` | Register Jupyter kernel as `fairfluence`          |
 | `make remove-kernel`  | Unregister existing kernel (if needed)                  |
 | `make clean`        | Delete the virtual environment folder                      |
 
@@ -79,19 +91,13 @@ You can now select **ml-data-profiler** as a kernel in Jupyter Notebook/Lab.
 ```bash
 python main.py
 ```
-
-To get Influence(with Logistic Regression):
-```
-influencer = LogisticInfluence(mode, X_train, y_train)
-influences = Influencer.get_influence(X_test[0], y_test[0])
-```
 ---
 
 ## 👥 Contributors
 
 - **Aiman Al-Hazmi** 
 - **Letian Wang** 
-- **3**  
-- **4**
+- **Luciano Duarte**  
+- **Nicolas Korjahn**
 
 ---
