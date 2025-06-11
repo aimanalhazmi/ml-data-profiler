@@ -44,8 +44,8 @@ print("\n==== Outlier Detection (Z-score) ====")
 outlier_idx = OutlierDetector(method='zscore', threshold=40).detect(X_train)
 print("Outlier indices:", np.unique(outlier_idx[0]))
 
-# === 5. Influence Function 检测 ===
-print("\n==== Influence Function Detection ====")
+# === 5. influence Function 检测 ===
+print("\n==== influence Function Detection ====")
 model = LogisticRegression(max_iter=500).fit(X_train, y_train)
 infl_detector = InfluenceOutlierDetector(model, X_train, y_train)
 topk_idx, infl_scores = infl_detector.detect(X_test[:5], y_test[:5],top_k=50)
