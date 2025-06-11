@@ -16,13 +16,13 @@ install:
 	@echo "Environment setup complete."
 
 jupyter-kernel:
-	@echo "Registering Jupyter kernel as 'ml-data-profiler'..."
+	@echo "Registering Jupyter kernel as 'fairfluence'..."
 	@$(PIP) install ipykernel
-	@$(VENV_DIR)/bin/python -m ipykernel install --user --name=ml-data-profiler --display-name "ml-data-profiler"
+	@$(VENV_DIR)/bin/python -m ipykernel install --user --name=fairfluence --display-name "fairfluence"
 
 remove-kernel:
-	@echo "Removing old Jupyter kernel 'ml-data-profiler' (if exists)..."
-	@jupyter kernelspec uninstall -f ml-data-profiler || true
+	@echo "Removing old Jupyter kernel 'fairfluence' (if exists)..."
+	@jupyter kernelspec uninstall -f fairfluence || true
 
 activate:
 	@echo "To activate the environment, run:"
