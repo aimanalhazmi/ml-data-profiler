@@ -6,9 +6,6 @@ from kaggle.api.kaggle_api_extended import KaggleApi #ToDo integrate into requir
 import os
 
 """
-# should cleaning of the data happen here????
-
-What is with mutliple datasets in one source? e.g. https://www.kaggle.com/datasets/kamrangayibov/football-data-european-top-5-leagues
 
 compatible with:
 - Tabular data
