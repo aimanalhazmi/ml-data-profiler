@@ -142,6 +142,7 @@ class HuggingFaceIngestor(BaseIngestor):
 
         save_path = f"../../data/{dataset_name}.csv"
         dataset.to_csv(save_path)
+        return dataset
 
 # load data from Kaggle
 class KaggleIngestor(BaseIngestor):
@@ -297,6 +298,8 @@ class KaggleIngestor(BaseIngestor):
         dataset_name = self.get_name(dataset_id, self.file_index)
         self.transform_raw_data(path, output_path, dataset_name)
         self.delete_raw_data(path, dataset_name)
+        final_csv = output_path + dataset_name.replace(os.path.splitext(dataset_name)[1], "") + ".csv"
+        return pd.read_csv(final_csv)
 
 # load data from OpenML
 class OpenMLIngestor(BaseIngestor):
