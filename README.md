@@ -15,6 +15,7 @@ A Python library for **profiling**, **influence-based quality assessment**, **Au
 - **Fairness analysis** using Fairlearn and sensitive attributes
 - AutoML evaluation for performance analysis
 - Visual report generation summarizing influence, quality, fairness, and performance
+- Supports inputting a dataset URL, choosing a model, viewing analysis and downloading the report through an interactive UI
 
 ---
 
@@ -34,6 +35,7 @@ fairfluence/
 │   ├── reports/            # Visual and text-based reporting utilities
 │   ├── utils/              # Shared helper functions (logging, configuration, report generation)
 │   └── main.py             # End-to-end CLI script to run the full pipeline
+│   └── app.py              # Streamlit UI entry point
 ├── outputs/                # Generated reports, scores, visualizations
 ├── tests/                  # Unit tests for individual modules
 ├── requirements.txt        # Project dependencies
@@ -88,6 +90,11 @@ You can now select **fairfluence** as a kernel in Jupyter Notebook/Lab.
 
 ## 📈 Example Usage (after setup)
 
+### Run Streamlit App
+```bash
+streamlit run app.py  
+```
+### Run CLI Pipeline
 ```bash
 python main.py
 ```
