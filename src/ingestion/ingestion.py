@@ -4,6 +4,8 @@ from datasets import load_dataset #Todo integrate into requirements.txt V 3.6.0
 from huggingface_hub import DatasetInfo, HfApi
 from kaggle.api.kaggle_api_extended import KaggleApi #ToDo integrate into requirements kaggle-1.7.4.5
 import os
+import openml
+import chardet
 
 """
 
@@ -125,7 +127,7 @@ class HuggingFaceIngestor(BaseIngestor):
         file_name = file_link.split("/")[-1]
         return file_name
     
-    def load_data(self) -> None:
+    def load_data(self) -> pd.DataFrame:
         """
         Load the dataset from Hugging Face, convert it to CSV format, and save it locally.
         The data is saved in the '../../data/' directory using the original file name.
@@ -142,7 +144,7 @@ class HuggingFaceIngestor(BaseIngestor):
 
         save_path = f"../../data/{dataset_name}.csv"
         dataset.to_csv(save_path)
-        return dataset
+        return pd.read_csv(save_path)
 
 # load data from Kaggle
 class KaggleIngestor(BaseIngestor):
@@ -197,13 +199,13 @@ class KaggleIngestor(BaseIngestor):
         relevant_part = link.split("/datasets/")[1].split("/")
         return f"{relevant_part[0]}/{relevant_part[1]}"
     
-    def download_kaggle_dataset(self, dataset_id: str, target_dir: str) -> None:
+    def download_kaggle_dataset(self, dataset_id: str, path: str) -> None:
         """
         Download a specific file from a Kaggle dataset to a target directory.
 
         Args:
             dataset_id (str): The Kaggle dataset ID.
-            target_dir (str): Local directory to store the downloaded file.
+            path (str): Local directory to store the downloaded file.
 
         Raises:
             RuntimeError: If the Kaggle API key is not found or configured.
@@ -216,7 +218,8 @@ class KaggleIngestor(BaseIngestor):
         api.authenticate()
 
         file_name = self.get_name(dataset_id, self.file_index)
-        api.dataset_download_file(dataset_id, file_name=file_name, path=target_dir)
+        api.dataset_download_file(dataset_id, file_name=file_name, path=path)
+
 
     def get_name(self, dataset_id: str, file_index: int) -> str:
         """
@@ -252,7 +255,12 @@ class KaggleIngestor(BaseIngestor):
         output_path = output_path + dataset_name.replace(ext, "") + ".csv"
 
         if ext == ".csv":
-            df = pd.read_csv(path)
+            try:
+                df = pd.read_csv(path)
+            except UnicodeDecodeError:
+                with open(path, 'rb') as f:
+                    result = chardet.detect(f.read(10000))
+                    df = pd.read_csv(path, encoding=result['encoding'])
         elif ext == ".tsv":
             df = pd.read_csv(path, sep="\t")
         elif ext == ".json":
@@ -282,7 +290,7 @@ class KaggleIngestor(BaseIngestor):
         else:
             print(f"{path} doesn't exist.")
                 
-    def load_data(self):
+    def load_data(self) -> pd.DataFrame:
         """
         Orchestrate the full data ingestion process:
         - Parse dataset ID
@@ -299,14 +307,78 @@ class KaggleIngestor(BaseIngestor):
         self.transform_raw_data(path, output_path, dataset_name)
         self.delete_raw_data(path, dataset_name)
         final_csv = output_path + dataset_name.replace(os.path.splitext(dataset_name)[1], "") + ".csv"
+        print(final_csv)
         return pd.read_csv(final_csv)
 
 # load data from OpenML
 class OpenMLIngestor(BaseIngestor):
     def __init__(self, link, file_index):
+        """
+        Initialize the OpenML ingestor with a dataset link.
+
+        Args:
+            link (str): URL pointing to an OpenML dataset (must include 'id=...').
+            file_index (int): Not used for OpenML, included for API consistency.
+        """
         super().__init__(link, file_index)
         
+    def get_dataset_id(self, link: str) -> str:
+        """
+        Extract the dataset ID from the OpenML URL.
+
+        Args:
+            link (str): The OpenML dataset URL.
+
+        Returns:
+            str: Dataset ID as a string.
+
+        Raises:
+            ValueError: If the dataset ID is missing in the link.
+        """
+        link_as_list = link.split("www.openml.org/")[1].split("&")
+        dataset_id = ""
+        contains_id = False
+        for element in link_as_list:
+            if "id=" in element:
+                contains_id = True
+                dataset_id = element.split("=")[1]
+        if not contains_id:
+            raise ValueError(
+                "The link is not valid, it's missing the id of the dataset."
+            )
+        return dataset_id
+
+    def add_target_column(self, df, y, dataset):
+        """
+        Append the target column to the DataFrame using the correct name.
+
+        Args:
+            df (pd.DataFrame): The feature data.
+            y (pd.Series): Target values.
+            dataset (openml.datasets.OpenMLDataset): The OpenML dataset object.
+
+        Returns:
+            pd.DataFrame: DataFrame with the target column added.
+        """
+        target_name = dataset.default_target_attribute
+        df[target_name] = y
+        return df
 
     def load_data(self):
-        pass
-        
+        """
+        Load a dataset from OpenML, attach the target column if applicable,
+        and save it as a CSV file in the local data directory.
+        """
+        dataset_id = self.get_dataset_id(self.link)
+        print(dataset_id)
+        print(type(dataset_id))
+        dataset = openml.datasets.get_dataset(dataset_id)
+        dataset_name = dataset.name
+        df, y, *_ = dataset.get_data()
+        if y is not None:
+            df = self.add_target_column(df, y, dataset)
+        dataset_name = dataset.name.replace(" ", "_")
+        save_path = f"../../data/{dataset_name}.csv"
+        df.to_csv(save_path, index=False)
+
+        return pd.read_csv(save_path)
