@@ -23,7 +23,7 @@ if st.button("Load Dataset") and url:
 
         st.session_state.df = df
     st.success("Dataset loaded successfully!")
-    st.dataframe(df.head())
+    st.dataframe(df)
 
 #Model Selection
 if "df" in st.session_state:
