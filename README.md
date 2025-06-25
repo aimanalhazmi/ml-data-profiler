@@ -23,24 +23,39 @@ A Python library for **profiling**, **influence-based quality assessment**, **Au
 
 ```
 fairfluence/
-├── data/                   # Downloaded datasets and local CSVs
-├── notebooks/              # Exploratory notebooks for analysis & prototyping
+├── data/                           # Downloaded datasets and local CSVs
+├── notebooks/                      # Exploratory notebooks for analysis & prototyping
 ├── src/
-│   ├── ingestion/          # Dataset loaders (OpenML, Kaggle, HF)
-│   ├── model/              # Model training utilities (e.g., train_model.py)
-│   ├── influence/          # Influence score computation
-│   ├── quality/            # Data quality assessment logic
-│   ├── fairness/           # Fairness analysis and bias detection
-│   ├── automl/             # Integration with automated ML workflows
-│   ├── reports/            # Visual and text-based reporting utilities
-│   ├── utils/              # Shared helper functions (logging, configuration, report generation)
-│   └── main.py             # End-to-end CLI script to run the full pipeline
-│   └── app.py              # Streamlit UI entry point
-├── outputs/                # Generated reports, scores, visualizations
-├── tests/                  # Unit tests for individual modules
-├── requirements.txt        # Project dependencies
-├── Makefile                # Build and setup commands
-└── README.md               # Project documentation
+│   ├── ingestion/                  # Dataset loaders (OpenML, Kaggle, HF)
+│   ├── preprocessing/             
+│   │   ├── base.py                 # Shared preprocessing logic (e.g. encoders, scalers)
+│   │   ├── quality.py              # Quality-specific preprocessing
+│   │   └── fairness.py             # Fairness-specific preprocessing
+│   ├── analysis/                   # Comparison, statistics & visualization
+│   │   ├── stats.py                # Summary stats, distributions, correlations
+│   │   ├── compare.py              # Before vs after comparisons
+│   │   ├── visual.py               # Matplotlib/seaborn/plotly plots
+│   ├── model/
+│   │   ├── builder.py              # ModelBuilder class to manage model types
+│   │   ├── registry.py             # Model registry or config-driven loader
+│   │   ├── train.py                # Model training
+│   ├── influence/                  # Influence score computation
+│   ├── quality/
+│   │   ├── no_influence.py         # Quality checks without influence
+│   │   ├── with_influence.py       # Quality analysis with influence
+│   │   └── clean.py                # Cleaning logic for data quality
+│   ├── fairness/
+│   │   ├── no_influence.py         # Fairness metrics (no influence)
+│   │   ├── with_influence.py       # Fairness + influence debugging
+│   │   └── clean.py                # Fairness-based filtering/repair
+│   ├── utils/                      # Shared helper functions (logging, configuration)
+├── outputs/                        # Generated reports, scores, visualizations
+├── tests/                          # Unit tests for individual modules
+├── app.py                          # Streamlit UI entry point
+├── main.py                         # End-to-end CLI script to run the full pipeline
+├── requirements.txt                # Project dependencies
+├── Makefile                        # Build and setup commands
+└── README.md                       # Project documentation
 ```
 
 ---
