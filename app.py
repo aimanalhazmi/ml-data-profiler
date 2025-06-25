@@ -6,13 +6,13 @@ from src.ingestion.loader import load_dataset
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
 
-#Dataset Input
+# Dataset Input
 url = st.text_input("Enter dataset URL (OpenML, Kaggle, HuggingFace)")
 
 if st.button("Load Dataset") and url:
     with st.spinner("Loading dataset..."):
         # example usage
-        #df = pd.DataFrame({"example_column": [1, 2, 3]})
+        # df = pd.DataFrame({"example_column": [1, 2, 3]})
 
         df = load_dataset(url)
 
@@ -20,7 +20,7 @@ if st.button("Load Dataset") and url:
     st.success("Dataset loaded successfully!")
     st.dataframe(df)
 
-#Model Selection
+# Model Selection
 if "df" in st.session_state:
     st.markdown("---")
     model_type = st.selectbox("Choose model", ["Logistic Regression", "SVM"])
@@ -28,10 +28,9 @@ if "df" in st.session_state:
     if st.button("Train Model and Compute Influence"):
         with st.spinner("Training model and computing influence scores..."):
             # Replace with training and influence pipeline
-            influence_df = pd.DataFrame({
-                "index": [0, 1, 2],
-                "influence_score": [0.5, 0.3, 0.1]
-            })
+            influence_df = pd.DataFrame(
+                {"index": [0, 1, 2], "influence_score": [0.5, 0.3, 0.1]}
+            )
             st.session_state.influence_df = influence_df
         st.success("Influence scores computed!")
         st.dataframe(influence_df.sort_values("influence_score", ascending=False))
@@ -62,12 +61,13 @@ if "quality" in st.session_state and "fairness" in st.session_state:
             st.session_state.report_path = report_path
         st.success("Report generated!")
 
-    if "report_path" in st.session_state and os.path.exists(st.session_state.report_path):
+    if "report_path" in st.session_state and os.path.exists(
+        st.session_state.report_path
+    ):
         with open(st.session_state.report_path, "rb") as f:
             st.download_button(
                 label="Download Final Report",
                 data=f,
                 file_name=os.path.basename(st.session_state.report_path),
-                mime="application/pdf"
+                mime="application/pdf",
             )
-

@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+
+
 ## basic empty detection method without using influence function.
 class empty_detection:
     def __init__(self):
@@ -10,4 +12,3 @@ class empty_detection:
 
     def detect(self, df: pd.DataFrame, threshold=0.2):
         return df.columns[df.isnull().mean() > threshold].tolist()
-

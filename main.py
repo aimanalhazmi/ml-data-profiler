@@ -29,7 +29,7 @@ def run_pipeline(dataset_link: str, model_type: str):
     X_train, X_test, y_train, y_test = train_test_split(**parameters)
 
     # Train model
-    model_q = train_model(X_train,y_train, model_type)
+    model_q = train_model(X_train, y_train, model_type)
 
     influence_q = compute_influence(model_q, X_train, y_train)
 
@@ -40,16 +40,26 @@ def run_pipeline(dataset_link: str, model_type: str):
 
     cleaned_q_no = clean_data_quality()
     parameters = {}
-    X_train_cleaned_q_no, X_test_cleaned_q_no, y_train_cleaned_q_no, y_test_cleaned_q_no = train_test_split(**parameters)
-    #model_q_no = train_model(X_train_cleaned_q_no, y_train_cleaned_q_no, model_type)
+    (
+        X_train_cleaned_q_no,
+        X_test_cleaned_q_no,
+        y_train_cleaned_q_no,
+        y_test_cleaned_q_no,
+    ) = train_test_split(**parameters)
+    # model_q_no = train_model(X_train_cleaned_q_no, y_train_cleaned_q_no, model_type)
 
     parameters = {}
-    X_train_cleaned_q_with, X_test_cleaned_q_with, y_train_cleaned_q_witho, y_test_cleaned_q_with = train_test_split(**parameters)
+    (
+        X_train_cleaned_q_with,
+        X_test_cleaned_q_with,
+        y_train_cleaned_q_witho,
+        y_test_cleaned_q_with,
+    ) = train_test_split(**parameters)
     cleaned_q_with = clean_data_quality()
-    #model_q_with = train_model(X_train_cleaned_q_with, y_train_cleaned_q_witho, model_type)
+    # model_q_with = train_model(X_train_cleaned_q_with, y_train_cleaned_q_witho, model_type)
 
-    #compare_results()
-    #generate_report()
+    # compare_results()
+    # generate_report()
 
     # ========== Fairness Pipeline ==========
     df_f = preprocess_fairness(df.copy())
@@ -64,8 +74,9 @@ def run_pipeline(dataset_link: str, model_type: str):
 
     fairness_no_influence_results = fairness_no.check_fairness(df_f)
 
-
     fairness_with_influence_results = fairness_with.check_fairness(df_f, influence_f)
 
-    report_f = compare_results(fairness_no_influence_results, fairness_with_influence_results)
+    report_f = compare_results(
+        fairness_no_influence_results, fairness_with_influence_results
+    )
     generate_report(report_f)
