@@ -6,3 +6,4 @@ streamlit~=1.45.1
 pandas~=2.3.0
 openml~=0.15.1
 chardet~=5.2.0
+black~=25.1.0

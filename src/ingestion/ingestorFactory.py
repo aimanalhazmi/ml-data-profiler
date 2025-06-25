@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
-from datasets import load_dataset #Todo integrate into requirements.txt V 3.6.0
+from datasets import load_dataset  # Todo integrate into requirements.txt V 3.6.0
 from huggingface_hub import DatasetInfo, HfApi
-from kaggle.api.kaggle_api_extended import KaggleApi #ToDo integrate into requirements kaggle-1.7.4.5
+from kaggle.api.kaggle_api_extended import (
+    KaggleApi,
+)  # ToDo integrate into requirements kaggle-1.7.4.5
 import os
 import openml
 import chardet
@@ -16,6 +18,7 @@ compatible with:
 
 """
 
+
 class BaseIngestor:
     def __init__(self, link: str, file_index: int):
         self.link = link
@@ -23,6 +26,7 @@ class BaseIngestor:
 
     def load_data(self):
         raise NotImplementedError
+
 
 class IngestorFactory:
     def __init__(self, link: str, file_number: int = 0):
@@ -50,14 +54,11 @@ class IngestorFactory:
         else:
             raise ValueError("Unknown platform.")
 
+
 # load data from hugging face
 class HuggingFaceIngestor(BaseIngestor):
 
-    SUPPORTED_FORMATS = {
-        ".csv": "csv",
-        ".json": "json",
-        ".parquet": "parquet"
-    }
+    SUPPORTED_FORMATS = {".csv": "csv", ".json": "json", ".parquet": "parquet"}
 
     def __init__(self, link, file_index):
         """
@@ -79,7 +80,7 @@ class HuggingFaceIngestor(BaseIngestor):
         path = self.link.split("/datasets/")[-1]
         repo_id = path.split("/")[0] + "/" + path.split("/")[1]
         return repo_id
-    
+
     def get_repo_info(self, repo_id: str) -> DatasetInfo:
         """
         Fetch metadata for the given dataset repository.
@@ -93,8 +94,8 @@ class HuggingFaceIngestor(BaseIngestor):
 
         api = HfApi()
         info = api.dataset_info(repo_id)
-        return(info)
-    
+        return info
+
     def get_file_url(self, repo_id: str, repo_info) -> tuple[str, str]:
         """
         Find a supported file in the repository and return its download URL and format.
@@ -113,7 +114,7 @@ class HuggingFaceIngestor(BaseIngestor):
                     file_url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
                     return file_url, self.SUPPORTED_FORMATS[format]
         raise FileNotFoundError("Found no fitting file")
-    
+
     def get_name(self, file_link: str) -> str:
         """
         Extract the file name from the download URL.
@@ -126,7 +127,7 @@ class HuggingFaceIngestor(BaseIngestor):
         """
         file_name = file_link.split("/")[-1]
         return file_name
-    
+
     def load_data(self) -> pd.DataFrame:
         """
         Load the dataset from Hugging Face, convert it to CSV format, and save it locally.
@@ -134,17 +135,17 @@ class HuggingFaceIngestor(BaseIngestor):
         """
         repo_id = self.get_repo_id()
         repo_info = self.get_repo_info(repo_id)
-        file_link, file_format = self.get_file_url(repo_id,repo_info)
-
+        file_link, file_format = self.get_file_url(repo_id, repo_info)
 
         dataset = load_dataset(file_format, data_files=file_link)
         dataset = dataset["train"]
 
-        dataset_name = self.get_name(self.link)      
+        dataset_name = self.get_name(self.link)
 
         save_path = f"../../data/{dataset_name}.csv"
         dataset.to_csv(save_path)
         return pd.read_csv(save_path)
+
 
 # load data from Kaggle
 class KaggleIngestor(BaseIngestor):
@@ -158,7 +159,7 @@ class KaggleIngestor(BaseIngestor):
         """
         super().__init__(link, file_index)
 
-    def is_kaggle_configured(self): # ToDO in ReadMe integrieren
+    def is_kaggle_configured(self):  # ToDO in ReadMe integrieren
         """
         Check if the Kaggle API is properly configured.
 
@@ -166,7 +167,7 @@ class KaggleIngestor(BaseIngestor):
             bool: True if the API key exists in ~/.kaggle/kaggle.json, False otherwise.
         """
         return os.path.exists(os.path.expanduser("~/.kaggle/kaggle.json"))
-    
+
     def index_range_check(self, dataset_id: str) -> None:
         """
         Ensure that the provided file index is within the available file range.
@@ -183,9 +184,9 @@ class KaggleIngestor(BaseIngestor):
 
         if self.file_index > len(file_list):
             raise IndexError(
-                 f"file_index {self.file_index} is out of range. Dataset '{dataset_id}' contains only {len(file_list)} files."
+                f"file_index {self.file_index} is out of range. Dataset '{dataset_id}' contains only {len(file_list)} files."
             )
-    
+
     def get_dataset_id(self, link):
         """
         Extract the dataset ID from a Kaggle dataset URL.
@@ -198,7 +199,7 @@ class KaggleIngestor(BaseIngestor):
         """
         relevant_part = link.split("/datasets/")[1].split("/")
         return f"{relevant_part[0]}/{relevant_part[1]}"
-    
+
     def download_kaggle_dataset(self, dataset_id: str, path: str) -> None:
         """
         Download a specific file from a Kaggle dataset to a target directory.
@@ -220,7 +221,6 @@ class KaggleIngestor(BaseIngestor):
         file_name = self.get_name(dataset_id, self.file_index)
         api.dataset_download_file(dataset_id, file_name=file_name, path=path)
 
-
     def get_name(self, dataset_id: str, file_index: int) -> str:
         """
         Retrieve the filename of a dataset file by index.
@@ -234,9 +234,11 @@ class KaggleIngestor(BaseIngestor):
         """
         api = KaggleApi()
         api.authenticate()
-        return(api.dataset_list_files(dataset_id).files[file_index].name)
-        
-    def transform_raw_data(self, path: str, output_path: str, dataset_name: str) -> None:
+        return api.dataset_list_files(dataset_id).files[file_index].name
+
+    def transform_raw_data(
+        self, path: str, output_path: str, dataset_name: str
+    ) -> None:
         """
         Load the raw dataset file, convert it if necessary, and save it as a CSV.
 
@@ -258,9 +260,9 @@ class KaggleIngestor(BaseIngestor):
             try:
                 df = pd.read_csv(path)
             except UnicodeDecodeError:
-                with open(path, 'rb') as f:
+                with open(path, "rb") as f:
                     result = chardet.detect(f.read(10000))
-                    df = pd.read_csv(path, encoding=result['encoding'])
+                    df = pd.read_csv(path, encoding=result["encoding"])
         elif ext == ".tsv":
             df = pd.read_csv(path, sep="\t")
         elif ext == ".json":
@@ -289,7 +291,7 @@ class KaggleIngestor(BaseIngestor):
             print(f"{path} was deleted.")
         else:
             print(f"{path} doesn't exist.")
-                
+
     def load_data(self) -> pd.DataFrame:
         """
         Orchestrate the full data ingestion process:
@@ -299,16 +301,21 @@ class KaggleIngestor(BaseIngestor):
         - Convert to CSV
         - Remove raw file
         """
-        path = "../../data/kaggle_temp/" 
-        output_path = "../../data/" 
+        path = "../../data/kaggle_temp/"
+        output_path = "../../data/"
         dataset_id = self.get_dataset_id(self.link)
         self.download_kaggle_dataset(dataset_id, path)
         dataset_name = self.get_name(dataset_id, self.file_index)
         self.transform_raw_data(path, output_path, dataset_name)
         self.delete_raw_data(path, dataset_name)
-        final_csv = output_path + dataset_name.replace(os.path.splitext(dataset_name)[1], "") + ".csv"
+        final_csv = (
+            output_path
+            + dataset_name.replace(os.path.splitext(dataset_name)[1], "")
+            + ".csv"
+        )
         print(final_csv)
         return pd.read_csv(final_csv)
+
 
 # load data from OpenML
 class OpenMLIngestor(BaseIngestor):
@@ -321,7 +328,7 @@ class OpenMLIngestor(BaseIngestor):
             file_index (int): Not used for OpenML, included for API consistency.
         """
         super().__init__(link, file_index)
-        
+
     def get_dataset_id(self, link: str) -> str:
         """
         Extract the dataset ID from the OpenML URL.
