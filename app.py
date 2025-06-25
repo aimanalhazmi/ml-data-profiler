@@ -1,9 +1,7 @@
-from tkinter.scrolledtext import example
-
 import streamlit as st
 import pandas as pd
 import os
-from src.ingestion.ingestorFactory import IngestorFactory
+from src.ingestion.loader import load_dataset
 
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
@@ -16,10 +14,7 @@ if st.button("Load Dataset") and url:
         # example usage
         #df = pd.DataFrame({"example_column": [1, 2, 3]})
 
-        # Replace with ingestion logic
-        ingestor_factory = IngestorFactory(url, 1)
-        ingestor = ingestor_factory.create()
-        df = ingestor.load_data()
+        df = load_dataset(url)
 
         st.session_state.df = df
     st.success("Dataset loaded successfully!")
