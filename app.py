@@ -3,7 +3,7 @@ from tkinter.scrolledtext import example
 import streamlit as st
 import pandas as pd
 import os
-from src.ingestion.ingestion import IngestorFactory
+from src.ingestion.ingestorFactory import IngestorFactory
 
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")

@@ -1,5 +1,4 @@
+import pandas as pd
 
-
-
-def train_save_model(model_type:str, model_path:str):
+def train_model(X_train, y_train,  model_type:str):
     pass

@@ -1,4 +1,5 @@
 import pandas as pd
 
-def process()->pd.DataFrame:
+
+def preprocess_fairness(df: pd.DataFrame)->pd.DataFrame:
     pass

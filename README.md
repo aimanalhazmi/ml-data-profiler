@@ -27,6 +27,8 @@ fairfluence/
 ├── notebooks/                      # Exploratory notebooks for analysis & prototyping
 ├── src/
 │   ├── ingestion/                  # Dataset loaders (OpenML, Kaggle, HF)
+│   │   ├── ingestorFactory.py      # 
+│   │   ├── laoder.py               #
 │   ├── preprocessing/             
 │   │   ├── base.py                 # Shared preprocessing logic (e.g. encoders, scalers)
 │   │   ├── quality.py              # Quality-specific preprocessing
@@ -40,6 +42,7 @@ fairfluence/
 │   │   ├── registry.py             # Model registry or config-driven loader
 │   │   ├── train.py                # Model training
 │   ├── influence/                  # Influence score computation
+│   │   ├── compute.py              #
 │   ├── quality/
 │   │   ├── no_influence.py         # Quality checks without influence
 │   │   ├── with_influence.py       # Quality analysis with influence
