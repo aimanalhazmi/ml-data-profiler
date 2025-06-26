@@ -25,7 +25,7 @@ df = ingestor.load_data()
 
 # Future: Target column
 y = 'income'
-X = pd.get_dummies(df.drop(columns=['income']), drop_first=True)
+X = pd.get_dummies(df.drop(columns=[y]), drop_first=True)
 
 # Future: Sensitive Columns
 sens_cols = ['sex', 'race']
