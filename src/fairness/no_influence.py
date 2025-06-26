@@ -13,7 +13,7 @@ import os, sys
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, SRC)
 
-from ingestion.ingestion import IngestorFactory
+from ingestion.ingestorFactory import IngestorFactory
 
 # Import data
 
@@ -73,7 +73,7 @@ def compute_fairness_metrics_no_influence(df, target_col, sens_cols, model, test
     return records
 
 # Example usage
-results = compute_fairness_metrics(df, y, sens_cols, model)
+results = compute_fairness_metrics_no_influence(df, y, sens_cols, model)
 
 for r in results:
     print(f"Demographic Parity Difference: {r['DPD']:.4f}")
