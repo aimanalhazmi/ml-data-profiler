@@ -5,24 +5,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 from pyod.models.kpca import KPCA
 
-import os, sys
-SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, SRC)
-
-from ingestion.ingestorFactory import IngestorFactory
-
-# Import data
-
-# Future: Preprocessor
-link = "https://huggingface.co/datasets/scikit-learn/adult-census-income"
-ingestor_factory = IngestorFactory(link, 0)
-ingestor = ingestor_factory.create()
-df = ingestor.load_data()
-
-# Select numeric columns, in the future, all but the target wil be numeric.
-num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-
-
 # Statistical outliers: using mahalanobis distance
 #  α = 0.01 means we flag any point that lies outside the
 #  99% confidence ellipsoid under a multivariate normal
@@ -63,35 +45,3 @@ def kpca_outliers(df, num_cols, frac=1, contamination=0.05):
     full_mask = pd.Series(False, index=df.index)
     full_mask.loc[sample_df.index] = mask_sample
     return full_mask.values
-
-
-# Example usage
-m_mask = mahalanobis_outliers(df, num_cols, alpha=0.01)
-d_mask = dbscan_outliers(df, num_cols, eps=0.5, min_samples=5)
-k_mask = kpca_outliers(df, num_cols, frac=0.1)
-
-
-print(f"Total rows: {len(df)}")
-print(f"Mahalanobis outliers: {m_mask.sum()}")
-print(f"DBSCAN outliers: {d_mask.sum()}")
-print(f"KPCA outliers: {k_mask.sum()}\n")
-
-print("Sample Mahalanobis outliers:")
-print(df.loc[m_mask, num_cols].head(), "\n")
-print("Sample DBSCAN outliers:")
-print(df.loc[d_mask, num_cols].head(), "\n")
-print("Sample KPCA outliers:")
-print(df.loc[k_mask, num_cols].head())
-
-# Create asks to see overlap.
-m_and_d = np.logical_and(m_mask, d_mask)
-m_and_k = np.logical_and(m_mask, k_mask)
-d_and_k = np.logical_and(d_mask, k_mask)
-all_three = m_mask & d_mask & k_mask
-
-# In case you want to see the overlap between the methods.
-print("Overlap counts:")
-print(f"Mahalanobis and DBSCAN: {m_and_d.sum()}")
-print(f"Mahalanobis and KPCA: {m_and_k.sum()}")
-print(f"DBSCAN and KPCA: {d_and_k.sum()}")
-print(f"All three methods: {all_three.sum()}")
