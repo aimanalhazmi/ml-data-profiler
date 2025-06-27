@@ -67,7 +67,7 @@ def influence_outliers(
     # Establish the statistical threshold
     mu = avg_inf.mean()
     sigma = avg_inf.std()
-    thresh = mu + sigma_multiplier * sigma
+    thresh = max(mu + sigma_multiplier * sigma, 0.0) # Keeping just the positive tail
 
     # Create the mask of train‐indices whose influence exceeds threshold
     mask = avg_inf > thresh
@@ -90,18 +90,3 @@ print(f"Found {len(idxs)} influence‐based outliers\n")
 print("Sample of influence‐based outliers from X_train:")
 print(X_train.loc[orig_idxs].head(), "\n")
 
-# PCA Visualization to understand it.
-X2 = PCA(n_components=2, random_state=912).fit_transform(X_train.values)
-plt.figure(figsize=(8,6))
-plt.scatter(X2[:,0], X2[:,1], c=y_train, cmap="coolwarm", alpha=0.5)
-if len(idxs):
-    plt.scatter(
-        X2[idxs,0], X2[idxs,1],
-        facecolors="none", edgecolors="red", s=100,
-        label="Influence outliers"
-    )
-    plt.legend()
-plt.xlabel("PCA Component 1")
-plt.ylabel("PCA Component 2")
-plt.title("Influence‐based outliers in the training set")
-plt.show()
