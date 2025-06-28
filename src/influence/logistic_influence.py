@@ -14,7 +14,8 @@ class LogisticInfluence(InfluenceFunctionBase):
         probs = self.model.predict_proba(self.X_train)[:, 1]  # P(y = 1 | x)
         S = np.diag(probs * (1 - probs))
         H = self.X_train.T @ S @ self.X_train
-        return np.linalg.inv(H)
+        H_reg = H + 1e-6 * np.eye(H.shape[0])
+        return np.linalg.inv(H_reg)
 
     def _grad_loss(self, x, y):
         pred = self.model.predict_proba(x.reshape(1, -1))[0, 1]
