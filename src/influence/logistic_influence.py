@@ -37,3 +37,43 @@ class LogisticInfluence(InfluenceFunctionBase):
             influence_i = self.get_influence(X_test[i], y_test[i])
             total_influence += influence_i
         return total_influence / len(X_test)
+
+class LinearSVMInfluence(InfluenceFunctionBase):
+    def __init__(self, model, X_train, y_train, reg=1.0):
+        super().__init__(model, loss_fn=None)
+        self.X_train = X_train
+        self.y_train = y_train
+        self.reg = reg
+        self.hessian_inv = self._get_inv_hessian()
+
+    def _grad_loss(self, x, y):
+        """Subgradient of hinge loss"""
+        margin = y * np.dot(self.model.coef_, x)
+        if margin >= 1:
+            return np.zeros_like(x)
+        else:
+            return -y * x
+
+    def _get_inv_hessian(self):
+        """
+        For hinge loss, H ≈ λ * I (only L2 regularization)
+        You can also use: H ≈ Xᵗ D X + λI for smoother approximation
+        """
+        d = self.X_train.shape[1]
+        return np.linalg.inv(self.reg * np.eye(d))
+
+    def get_influence(self, x_test, y_test):
+        grad_test = self._grad_loss(x_test, y_test)
+        influences = []
+        for i in range(len(self.X_train)):
+            grad_i = self._grad_loss(self.X_train[i], self.y_train[i])
+            infl = - grad_test.T @ self.hessian_inv @ grad_i
+            influences.append(infl)
+        return influences
+
+    def average_influence(self, X_test, y_test):
+        total_influence = np.zeros(len(self.X_train))
+        for i in range(len(X_test)):
+            influence_i = self.get_influence(X_test[i], y_test[i])
+            total_influence += influence_i
+        return total_influence / len(X_test)
