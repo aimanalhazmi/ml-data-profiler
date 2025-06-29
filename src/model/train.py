@@ -1,5 +1,8 @@
-import pandas as pd
-
+from sklearn.linear_model import LogisticRegression
 
 def train_model(X_train, y_train, model_type: str):
-    pass
+    if model_type == 'logistic':
+        model = LogisticRegression(max_iter=500).fit(X_train, y_train)
+    else:
+        raise ValueError('Model not supported')
+    return model
