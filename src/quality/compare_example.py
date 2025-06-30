@@ -17,7 +17,3 @@ positive_class = ">50K"
 
 result_df = compare_outlier_removals(df, num_cols, target_col, positive_class, model='logistic')
 print(result_df)
-
-print(f"F1 on original data: {result_df['f1_orig']:.4f}")
-print(f"F1 after dropping statistic outliers: {result_df['f1_statistic']:.4f}")
-print(f"F1 after dropping influence outliers: {result_df['f1_influence']:.4f}")
