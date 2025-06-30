@@ -26,5 +26,5 @@ cleaned_mahal = drop_statistic_outliers(df, num_cols)
 print(f"\nRows after dropping Mahalanobis outliers: {len(cleaned_mahal)}")
 
 # How to remove influence outliers
-cleaned_infl = drop_influence_outliers(df, target_col, positive_class, sigma_multiplier=1.0)
+cleaned_infl = drop_influence_outliers(df, target_col, positive_class, sigma_multiplier=1.0) #dont forget you can use model = 'logistic', 'svm' here
 print(f"Rows after dropping Influence outliers: {len(cleaned_infl)}")

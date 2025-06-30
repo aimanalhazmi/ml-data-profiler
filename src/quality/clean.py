@@ -9,9 +9,9 @@ from no_influence import mahalanobis_outliers
 from with_influence import influence_outliers
 
 # For Report #1
-def summarize_outliers(df, num_cols, target_col, positive_class, alpha=0.01, sigma_multiplier = 3.0):
+def summarize_outliers(df, num_cols, target_col, positive_class, alpha=0.01, sigma_multiplier = 3.0, model='logistic'):
     m_mask = mahalanobis_outliers(df, num_cols, alpha=alpha)
-    i_mask = influence_outliers(df, target_col=target_col, positive_class=positive_class, frac=0.01, test_size=0.2, random_state=912, sigma_multiplier=sigma_multiplier)
+    i_mask = influence_outliers(df, target_col=target_col, positive_class=positive_class, frac=0.01, test_size=0.2, random_state=912, sigma_multiplier=sigma_multiplier, model=model)
     total = len(df)
 
     inf_count = i_mask.sum()
@@ -35,7 +35,7 @@ def drop_statistic_outliers(df, num_cols, alpha=0.01):
     return df.loc[~mask].copy()
 
 # return df without rows flagged by Influence‐based method
-def drop_influence_outliers(df, target_col, positive_class, sigma_multiplier = 3.0):
-    mask = influence_outliers(df, target_col=target_col, positive_class=positive_class, frac=0.01, test_size=0.2, random_state=912, sigma_multiplier=sigma_multiplier)
+def drop_influence_outliers(df, target_col, positive_class, sigma_multiplier = 3.0, model = 'logistic'):
+    mask = influence_outliers(df, target_col=target_col, positive_class=positive_class, frac=0.01, test_size=0.2, random_state=912, sigma_multiplier=sigma_multiplier, model=model)
     return df.loc[~mask].copy()
 

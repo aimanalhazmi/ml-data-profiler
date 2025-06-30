@@ -12,7 +12,7 @@ from model.train import train_model
 # This flags the really influential rows in your dataset based on a logistic‐influence score.
 # It slects those that deviate "sigma_multiplier" standard deviations from the mean.
 # frac is just the amount of test points used to calculate influence, preferably low.
-def influence_outliers(df, target_col, positive_class, frac = 0.01, test_size = 0.2, random_state= 912, sigma_multiplier = 3.0):
+def influence_outliers(df, target_col, positive_class, frac = 0.01, test_size = 0.2, random_state= 912, sigma_multiplier = 3.0, model='logistic'):
     # Turn the target column to a binary column
     y = (df[target_col] == positive_class).astype(int)
     X = pd.get_dummies(df.drop(columns=[target_col]), drop_first=True)
@@ -26,7 +26,7 @@ def influence_outliers(df, target_col, positive_class, frac = 0.01, test_size = 
     else:
         X_te, y_te = X_test, y_test
 
-    model = train_model(X_train.values,  y_train.values, "logistic")
+    model = train_model(X_train.values,  y_train.values, model)
 
     # Outlier calculation
     infl = LogisticInfluence(model, X_train.values.astype(np.float64), y_train.values.astype(np.float64))
