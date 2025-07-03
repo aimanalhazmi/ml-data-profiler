@@ -3,14 +3,14 @@ from sklearn.preprocessing import OneHotEncoder, KBinsDiscretizer, FunctionTrans
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
-from sklearn.impute import KNNImputer
+from sklearn.impute import KNNImputer, SimpleImputer
 from scipy.stats.mstats import winsorize
 import pandas as pd
 import numpy as np
 #import utils.preprocessing_utils as utils
 from pandas.api.types import is_numeric_dtype
 from preprocessing_dict import SENSITIVE_KEYWORDS
-from typing import Tuple
+from typing import Tuple, Dict
 
 class Preprocessor:
     def __init__(self, data: pd.DataFrame, target_column: str):
@@ -70,7 +70,16 @@ class Preprocessor:
 
         return numeric_columns, categorical_columns
 
+    def receive_number_of_columns(self) -> Dict[str, int]:
+        numeric_columns, categorical_columns = self.receive_categorized_columns()
+        _, text_columns, _ = self.categorize_columns()
 
+        column_dict = {"numeric_columns" : len(numeric_columns), 
+                       "categorical_columns" : len(categorical_columns),
+                       "text_columns" : len(text_columns)
+                       }
+
+        return column_dict
     
     def encode_target_column(self) -> pd.DataFrame:
         """
@@ -168,8 +177,12 @@ class Preprocessor:
         """
         text_columns = [column for column in text_columns if column not in sensitive_columns]
         transformers = []
+
+        for col in text_columns:
+            self.data[col] = self.data[col].fillna("")
         
         text_pipeline = Pipeline([
+            #("impute", SimpleImputer(strategy="constant", fill_value="")),
             ("vectorize", TfidfVectorizer(max_features=3000)),
             ("svd", TruncatedSVD(n_components=2))
         ])
@@ -178,7 +191,7 @@ class Preprocessor:
             transformers.append((
                 f"tfidf_{column}",
                 text_pipeline,
-                column 
+                column # column
             ))
 
         preprocessing = ColumnTransformer(transformers=transformers, remainder="drop")
@@ -422,7 +435,7 @@ class DataQualityPreprocessor(Preprocessor):
                 target_column (str): Placeholder for target column.
         """
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
-        sensitive_columns = self.find_sensitive_columns(self.data, text_columns)
+        sensitive_columns = []
 
         numeric_columns_df = self.encode_numeric_columns(numeric_columns, sensitive_columns)
 
@@ -434,15 +447,9 @@ class DataQualityPreprocessor(Preprocessor):
             categorical_columns_df = self.encode_categorical_columns_non_ohe(categorical_columns, sensitive_columns)
             categorical_columns_names = list(categorical_columns)
 
-        sensitive_columns_df = self.encode_sensitive_columns(sensitive_columns, numeric_columns)
-        numeric_columns = [column for column in numeric_columns if column not in sensitive_columns]
-        categorical_columns_names.extend(
-            [column for column in sensitive_columns if column not in categorical_columns_names]
-        )
-
         target_column_df = self.encode_target_column()
 
-        transformed_data = pd.concat([sensitive_columns_df, categorical_columns_df, numeric_columns_df, text_columns_df, target_column_df], axis=1) 
+        transformed_data = pd.concat([categorical_columns_df, numeric_columns_df, text_columns_df, target_column_df], axis=1) 
 
         return transformed_data, numeric_columns, categorical_columns_names, text_columns_transformed, sensitive_columns, self.target_column
 

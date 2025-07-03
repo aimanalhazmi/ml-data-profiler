@@ -17,18 +17,20 @@ compatible with:
 """
 
 class BaseIngestor:
-    def __init__(self, link: str, file_index: int):
+    def __init__(self, link: str, file_index: int, save_file: bool = False):
         self.link = link
         self.file_index = file_index
+        self.save_file = save_file
 
     def load_data(self):
         raise NotImplementedError
 
 class IngestorFactory:
-    def __init__(self, link: str, file_number: int = 0):
+    def __init__(self, link: str, file_number: int = 0, save_file: bool = False):
         self.link = link
 
         self.file_index = file_number - 1
+        self.save_file = save_file
 
     def create(self) -> BaseIngestor:
         """
@@ -42,11 +44,11 @@ class IngestorFactory:
         """
 
         if "huggingface.co" in self.link:
-            return HuggingFaceIngestor(self.link, self.file_index)
+            return HuggingFaceIngestor(self.link, self.file_index, self.save_file)
         elif "kaggle.com" in self.link:
-            return KaggleIngestor(self.link, self.file_index)
+            return KaggleIngestor(self.link, self.file_index, self.save_file)
         elif "openml.org" in self.link:
-            return OpenMLIngestor(self.link, self.file_index)
+            return OpenMLIngestor(self.link, self.file_index, self.save_file)
         else:
             raise ValueError("Unknown platform.")
 
@@ -59,7 +61,7 @@ class HuggingFaceIngestor(BaseIngestor):
         ".parquet": "parquet"
     }
 
-    def __init__(self, link, file_index):
+    def __init__(self, link, file_index, save_file):
         """
         Initialize the ingestor with a Hugging Face dataset link.
 
@@ -67,7 +69,7 @@ class HuggingFaceIngestor(BaseIngestor):
             link (str): URL to the Hugging Face dataset page.
             file_index (int): URL to the Hugging Face dataset page.
         """
-        super().__init__(link, file_index)
+        super().__init__(link, file_index, save_file)
 
     def get_repo_id(self) -> str:
         """
@@ -144,11 +146,14 @@ class HuggingFaceIngestor(BaseIngestor):
 
         save_path = f"../../data/{dataset_name}.csv"
         dataset.to_csv(save_path)
-        return pd.read_csv(save_path)
+        df = pd.read_csv(save_path)
+        if not self.save_file:
+            os.remove(save_path)
+        return df
 
 # load data from Kaggle
 class KaggleIngestor(BaseIngestor):
-    def __init__(self, link, file_index):
+    def __init__(self, link, file_index, save_file):
         """
         Initialize the Kaggle ingestor with a dataset link and file index.
 
@@ -156,7 +161,7 @@ class KaggleIngestor(BaseIngestor):
             link (str): URL to the Kaggle dataset.
             file_index (int): Index of the file to be loaded (0-based).
         """
-        super().__init__(link, file_index)
+        super().__init__(link, file_index, save_file)
 
     def is_kaggle_configured(self): # ToDO in ReadMe integrieren
         """
@@ -307,12 +312,14 @@ class KaggleIngestor(BaseIngestor):
         self.transform_raw_data(path, output_path, dataset_name)
         self.delete_raw_data(path, dataset_name)
         final_csv = output_path + dataset_name.replace(os.path.splitext(dataset_name)[1], "") + ".csv"
-        print(final_csv)
-        return pd.read_csv(final_csv)
+        df = pd.read_csv(final_csv)
+        if not self.save_file:
+            os.remove(final_csv)
+        return df
 
 # load data from OpenML
 class OpenMLIngestor(BaseIngestor):
-    def __init__(self, link, file_index):
+    def __init__(self, link, file_index, save_file):
         """
         Initialize the OpenML ingestor with a dataset link.
 
@@ -320,7 +327,7 @@ class OpenMLIngestor(BaseIngestor):
             link (str): URL pointing to an OpenML dataset (must include 'id=...').
             file_index (int): Not used for OpenML, included for API consistency.
         """
-        super().__init__(link, file_index)
+        super().__init__(link, file_index, save_file)
         
     def get_dataset_id(self, link: str) -> str:
         """
@@ -380,5 +387,7 @@ class OpenMLIngestor(BaseIngestor):
         dataset_name = dataset.name.replace(" ", "_")
         save_path = f"../../data/{dataset_name}.csv"
         df.to_csv(save_path, index=False)
-
-        return pd.read_csv(save_path)
+        df = pd.read_csv(save_path)
+        if not self.save_file:
+            os.remove(save_path)
+        return df
