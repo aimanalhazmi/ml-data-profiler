@@ -5,6 +5,6 @@ from . import utils
 __all__ = [
     "InfluenceFunctionBase",
     "LogisticInfluence",
-    #"SVM" TODO
-    "utils"
+    # "SVM" TODO
+    "utils",
 ]
