@@ -141,7 +141,7 @@ def run_pipeline(dataset_link: str, model_type: str):
     df = load_dataset(dataset_link)
 
     # Step 2: Generate basic stats
-    generate_stats(df)
+    generate_stats(df, "", "")
 
     # Data Quality Pipeline
     run_quality_pipeline(df.copy(), model_type)

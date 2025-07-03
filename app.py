@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from src.ingestion.loader import load_dataset
+from src.analysis import stats
 
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
@@ -18,7 +19,49 @@ if st.button("Load Dataset") and url:
 
         st.session_state.df = df
     st.success("Dataset loaded successfully!")
+
+
+# Show dataset and stats
+if "df" in st.session_state:
+    df = st.session_state.df
     st.dataframe(df)
+
+    tab1, tab2 = st.tabs(["Overview", "Alerts"])
+
+    with tab1:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Dataset Summary")
+            for key, value in stats.get_dataset_summary(df).items():
+                st.write(f"**{key.replace('_', ' ').title()}**: {value}")
+
+        with col2:
+            st.subheader("Variable Types")
+            for key, value in stats.get_variable_type_summary(df).items():
+                st.write(f"**{key.replace('_', ' ').title()}**: {value}")
+
+            st.subheader("Column Analysis")
+            selected_col = st.selectbox("Select a column", df.columns)
+            for key, value in stats.get_column_statistics(df, selected_col).items():
+                st.write(f"**{key.replace('_', ' ').title()}**: {value}")
+
+    with tab2:
+        st.subheader("Alerts")
+        alerts = stats.get_alerts(df)
+        if alerts:
+            for alert in alerts:
+                st.warning(alert)
+        else:
+            st.info("No alerts found.")
+
+    st.markdown("---")
+
+    ## ToDo: Only Target Columns and Sensitive selected_col
+    stats.plot_data_distribution_by_column(
+        df, df.columns[-1], streamlit_mode=True, st=st
+    )
+
 
 # Model Selection
 if "df" in st.session_state:
