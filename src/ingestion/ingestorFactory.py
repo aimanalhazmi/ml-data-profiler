@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
-from datasets import load_dataset #Todo integrate into requirements.txt V 3.6.0
+from datasets import load_dataset 
 from huggingface_hub import DatasetInfo, HfApi
-from kaggle.api.kaggle_api_extended import KaggleApi #ToDo integrate into requirements kaggle-1.7.4.5
+from kaggle.api.kaggle_api_extended import KaggleApi 
 import os
 import openml
 import chardet
@@ -18,6 +18,14 @@ compatible with:
 
 class BaseIngestor:
     def __init__(self, link: str, file_index: int, save_file: bool = False):
+        """
+        Base class for dataset ingestion.
+
+        Args:
+            link (str): URL or identifier for the dataset.
+            file_index (int): Zero-based index of which file to load (if multiple exist).
+            save_file (bool): Whether to keep the downloaded file locally.
+        """
         self.link = link
         self.file_index = file_index
         self.save_file = save_file
@@ -27,8 +35,15 @@ class BaseIngestor:
 
 class IngestorFactory:
     def __init__(self, link: str, file_number: int = 0, save_file: bool = False):
-        self.link = link
+        """
+        Factory to choose the correct ingestor based on URL.
 
+        Args:
+            link (str): Dataset URL.
+            file_number (int): 1-based file index, converted to zero-based internally.
+            save_file (bool): Whether to keep the downloaded file on disk.
+        """
+        self.link = link
         self.file_index = file_number - 1
         self.save_file = save_file
 
@@ -67,7 +82,8 @@ class HuggingFaceIngestor(BaseIngestor):
 
         Args:
             link (str): URL to the Hugging Face dataset page.
-            file_index (int): URL to the Hugging Face dataset page.
+            file_index (int): Not used for Hugging Face; present for API consistency.
+            save_file (bool): Whether to retain downloaded files locally.
         """
         super().__init__(link, file_index, save_file)
 
@@ -131,7 +147,7 @@ class HuggingFaceIngestor(BaseIngestor):
     
     def load_data(self) -> pd.DataFrame:
         """
-        Load the dataset from Hugging Face, convert it to CSV format, and save it locally.
+        Load the dataset from Hugging Face, convert it to CSV format, and optionally save it locally.
         The data is saved in the '../../data/' directory using the original file name.
         """
         repo_id = self.get_repo_id()
@@ -160,10 +176,11 @@ class KaggleIngestor(BaseIngestor):
         Args:
             link (str): URL to the Kaggle dataset.
             file_index (int): Index of the file to be loaded (0-based).
+            save_file (bool): Whether to keep downloaded file.
         """
         super().__init__(link, file_index, save_file)
 
-    def is_kaggle_configured(self): # ToDO in ReadMe integrieren
+    def is_kaggle_configured(self): 
         """
         Check if the Kaggle API is properly configured.
 
@@ -326,6 +343,7 @@ class OpenMLIngestor(BaseIngestor):
         Args:
             link (str): URL pointing to an OpenML dataset (must include 'id=...').
             file_index (int): Not used for OpenML, included for API consistency.
+            save_file (bool): Whether to keep saved CSV locally.
         """
         super().__init__(link, file_index, save_file)
         

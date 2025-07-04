@@ -7,7 +7,6 @@ from sklearn.impute import KNNImputer, SimpleImputer
 from scipy.stats.mstats import winsorize
 import pandas as pd
 import numpy as np
-#import utils.preprocessing_utils as utils
 from pandas.api.types import is_numeric_dtype
 from preprocessing_dict import SENSITIVE_KEYWORDS
 from typing import Tuple, Dict
@@ -19,11 +18,11 @@ class Preprocessor:
 
         Args:
             data (pd.DataFrame): The input DataFrame to preprocess.
+            target_column (str): Name of the column we consider the prediction target.
         """
         self.data = data
         self.target_column = target_column
 
-    # categorize columns
     def categorize_columns(self) -> Tuple[list, list, list]:
         """
         Categorize DataFrame columns into numeric, text, and categorical based on dtype and uniqueness.
@@ -61,6 +60,15 @@ class Preprocessor:
         return numeric_columns, text_columns, categorical_columns
     
     def receive_categorized_columns(self) -> Tuple[list, list]:
+        """
+        Get numeric and categorical column lists after removing any detected sensitive columns.
+
+        Returns:
+            Tuple[
+                List[str],  # numeric_columns (sans sensitive)
+                List[str]   # categorical_columns (including sensitive)
+            ]
+        """
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
         sensitive_columns = self.find_sensitive_columns(self.data, text_columns)
         numeric_columns = [column for column in numeric_columns if column not in sensitive_columns]
@@ -71,6 +79,12 @@ class Preprocessor:
         return numeric_columns, categorical_columns
 
     def receive_number_of_columns(self) -> Dict[str, int]:
+        """
+        Count how many numeric, categorical, and text columns there are (after sensitive removal).
+
+        Returns:
+            Dict[str,int]: counts under keys 'numeric_columns', 'categorical_columns', 'text_columns'
+        """
         numeric_columns, categorical_columns = self.receive_categorized_columns()
         _, text_columns, _ = self.categorize_columns()
 
@@ -83,14 +97,10 @@ class Preprocessor:
     
     def encode_target_column(self) -> pd.DataFrame:
         """
-        Pass through numeric columns excluding sensitive ones.
-
-        Args:
-            numeric_columns (List[str]): List of numeric column names.
-            sensitive_columns (List[str]): List of sensitive column names to exclude.
+        Extract the target column as a 1-column DataFrame (passthrough).
 
         Returns:
-            pd.DataFrame: DataFrame containing only non-sensitive numeric columns.
+            pd.DataFrame: A single-column DF containing the target.
         """
         transformers = []
 
@@ -182,7 +192,6 @@ class Preprocessor:
             self.data[col] = self.data[col].fillna("")
         
         text_pipeline = Pipeline([
-            #("impute", SimpleImputer(strategy="constant", fill_value="")),
             ("vectorize", TfidfVectorizer(max_features=3000)),
             ("svd", TruncatedSVD(n_components=2))
         ])
@@ -191,7 +200,7 @@ class Preprocessor:
             transformers.append((
                 f"tfidf_{column}",
                 text_pipeline,
-                column # column
+                column
             ))
 
         preprocessing = ColumnTransformer(transformers=transformers, remainder="drop")
@@ -359,6 +368,7 @@ class Preprocessor:
 
         Args:
             data (pd.DataFrame): DataFrame to search.
+            text_columns (List[str]): columns already treated as text.
 
         Returns:
             List[str]: List of sensitive column names.
@@ -385,6 +395,7 @@ class PreprocessorFactory:
         Args:
             data (pd.DataFrame): Input data.
             method (str): Preprocessing method ('data quality' or 'fairness').
+            target_column (str): name of the prediction target.
         """
         self.data = data
         self.method = method
@@ -458,6 +469,16 @@ class FairnessPreprocessor(Preprocessor):
         super().__init__(data, target_column)
 
     def encode_numeric_columns(self, numeric_columns: list, sensitive_columns: list) -> pd.DataFrame:
+        """
+        Impute, winsorize, and scale non-sensitive numeric features.
+
+        Args:
+            numeric_columns (List[str]): columns to treat.
+            sensitive_columns (List[str]): to exclude.
+
+        Returns:
+            pd.DataFrame: processed numeric matrix.
+        """
         numeric_columns = [column for column in numeric_columns if column not in sensitive_columns]
 
 
@@ -489,6 +510,15 @@ class FairnessPreprocessor(Preprocessor):
         return numeric_df
 
     def process_data(self, ohe:bool = False):
+        """
+        Full fairness pipeline: categorize → encode text/cat/numeric/sensitive/target.
+
+        Args:
+            ohe (bool): whether to one-hot encode categoricals.
+
+        Returns:
+            same signature as DataQualityPreprocessor.process_data
+        """
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
         sensitive_columns = self.find_sensitive_columns(self.data, text_columns)
 
