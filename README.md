@@ -92,6 +92,21 @@ make jupyter-kernel
 
 You can now select **fairfluence** as a kernel in Jupyter Notebook/Lab.
 
+### 5. Use Kaggle API (optional)
+To be able to use datasets from Kaggle, and as thus the API from Kaggle, you need an API token. Follow these steps:
+1. **Create or log in to your Kaggle account**  
+   Go to [kaggle.com](https://www.kaggle.com) and sign up or log in.
+
+2. **Generate an API token**  
+   - Click on your profile picture (top right) and select **“My Account”**.  
+   - Scroll down to the **“API”** section and click **“Create New API Token”**.  
+   - A file named `kaggle.json` will be downloaded to your computer.
+  
+3. **Create the `.kaggle` folder**  
+   Open File Explorer and navigate to your user’s home directory, for example:  C:\Users<YourUserName>\
+   If it doesn’t already exist, create a hidden folder called `.kaggle`: C:\Users\<YourUserName>\.kaggle
+   Copy the downloaded kaggle.json into the new folder.
+
 
 ## ⚙️ Makefile Commands
 

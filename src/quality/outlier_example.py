@@ -56,20 +56,6 @@ print(df.loc[k_mask, num_cols].head())
 print("\n--- Sample Influence outliers ---")
 print(df.loc[inf_mask, num_cols].head())
 
-
-def jaccard(a, b):
-    inter = np.logical_and(a, b).sum()
-    uni = np.logical_or(a, b).sum()
-    return inter / uni if uni else 0.0
-
-print("\n--- Pairwise Jaccard similarities ---")
-for col1 in mask_df.columns:
-    for col2 in mask_df.columns:
-        if col1 >= col2:
-            continue
-        score = jaccard(mask_df[col1], mask_df[col2])
-        print(f"{col1} vs {col2}: Jaccard = {score:.3f}")
-
 print("\n--- Raw Overlap Counts ---")
 m_and_d = m_mask & d_mask
 m_and_k = m_mask & k_mask

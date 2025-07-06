@@ -1,5 +1,5 @@
 from sklearn.linear_model import LogisticRegression
-from Influence.logistic_influence import LogisticInfluence
+from src.influence.logistic_influence import LogisticInfluence
 import numpy as np
 
 X_train = np.random.rand(20, 5)

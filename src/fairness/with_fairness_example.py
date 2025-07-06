@@ -2,23 +2,11 @@ import pandas as pd
 import numpy as np
 import os
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-
-from src.fairness.with_influence import evaluate_patterns
+from sklearn.preprocessing import StandardScaler
+from src.fairness.with_influence import evaluate_patterns, print_pattern_table
 from src.influence import LogisticInfluence
-
-
-def pattern_to_readable(pattern, columns):
-    readable = []
-    for col_idx, val in pattern.items():
-        col_name = columns[col_idx] if isinstance(col_idx, int) else col_idx
-        if isinstance(val, pd.Interval):
-            readable.append(f"{col_name} ∈ {val}")
-        else:
-            readable.append(f"{col_name} = {val}")
-    return readable
-
+from src.influence.logistic_influence import LinearSVMInfluence
+from src.model.train import train_model
 
 # === 1. read data ===
 current_dir = os.path.dirname(__file__)
@@ -37,32 +25,27 @@ numerical_cols = ['age', 'fnlwgt', 'education.num', 'capital.gain', 'capital.los
 y = (df['income'] == '>50K').astype(int).values
 
 # scaling
+df.drop('income', axis=1, inplace=True)
+df_encoded = pd.get_dummies(df, columns=categorical_cols)
 scaler = StandardScaler()
-X_numerical = scaler.fit_transform(df[numerical_cols])
+X_numerical = scaler.fit_transform(df_encoded)
+
 X_index = df.index
 X_train, X_test, y_train, y_test, train_index, test_index = train_test_split(X_numerical, y, X_index, test_size=0.2, random_state=42)
 
 
-model = LogisticRegression(max_iter=500).fit(X_train, y_train)
+model = train_model(X_train,y_train,"svm")
+#logistic_influence = LogisticInfluence(model, X_train, y_train)
+svm_influence = LinearSVMInfluence(model, X_train, y_train)
 
-logistic_influence = LogisticInfluence(model, X_train, y_train)
-X_train_infl = logistic_influence.average_influence(X_test[:5], y_test[:5])
+#X_train_infl = logistic_influence.average_influence(X_test[:10], y_test[:10])
+X_train_infl = svm_influence.average_influence(X_test[:5], y_test[:5])
 
 X_train_raw = df.loc[train_index].copy().reset_index(drop=True)
+
 print(X_train_raw)
+
 X_train_raw['influence'] = X_train_infl
-X_train_raw = X_train_raw.drop(columns=["income"])
+top_patterns = evaluate_patterns(X_train_raw, min_support=0.05, top_k=5, max_predicates=1)
 
-X_train_raw['predicted_label'] = model.predict(X_train)
-X_train_raw['true_label'] = y_train
-
-top_patterns = evaluate_patterns(X_train_raw, min_support=0.05, top_k=14)
-
-for i, p in enumerate(top_patterns):
-
-    print(f"Pattern {i + 1}:")
-    readable = pattern_to_readable(p['pattern'], df.columns)
-    for cond in readable:
-        print("  -", cond)
-    print(
-        f"  Support: {p['support']:.2%}, Responsibility: {p['responsibility']:.3f}, Interestingness: {p['interestingness']:.3f}")
+print_pattern_table(top_patterns)
