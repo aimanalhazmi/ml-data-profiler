@@ -1,5 +1,6 @@
 import pandas as pd
 from src.ingestion.ingestorFactory import IngestorFactory
+import streamlit as st
 
 
 def load_dataset(url: str, save_file=False) -> pd.DataFrame:

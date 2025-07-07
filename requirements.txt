@@ -8,3 +8,5 @@ openml~=0.15.1
 chardet~=5.2.0
 black~=25.1.0
 seaborn~=0.13.2
+pyod~=2.0.5
+fairlearn~=0.12.0
