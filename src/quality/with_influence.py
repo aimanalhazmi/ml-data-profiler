@@ -11,7 +11,7 @@ from influence.logistic_influence import LogisticInfluence
 # It slects those that deviate "sigma_multiplier" standard deviations from the mean.
 # frac is just the amount of test points used to calculate influence, preferably low.
 # Recieves the split data and the TRAINED model as a parameter
-def influence_outliers(X_train, X_test, y_train, y_test, model, frac = 0.01, random_state= 912, sigma_multiplier = 3.0):
+def influence_outliers(X_train, X_test, y_train, y_test, model, frac = 0.001, random_state= 912, sigma_multiplier = 3.0):
     if frac < 1.0:
         X_te = X_test.sample(frac=frac, random_state=random_state)
         y_te = y_test.loc[X_te.index]
