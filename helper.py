@@ -3,15 +3,11 @@ from streamlit import streamlit as st
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.model.train import train_model
-from src.model.registry import MODEL_REGISTRY
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
 from src.quality.compare import compare_outlier_removals
 from src.quality.clean import summarize_outliers
 from src.fairness.no_influence import compute_fairness_metrics
 from src.fairness.with_influence import evaluate_patterns, print_pattern_table
 from src.influence.logistic_influence import LinearSVMInfluence, LogisticInfluence
-import random
 
 
 def preprocess_data(df, method, ohe, target_column):
@@ -85,7 +81,7 @@ def quality(df, model_type, target_column):
     print(outlier_summary)
 
 
-def prepare(X, y, X_index, model_type, target_column):
+def prepare(orginal_X, X, y, X_index, model_type, target_column):
     random_state = 42
     test_size = 0.2
 
@@ -95,8 +91,7 @@ def prepare(X, y, X_index, model_type, target_column):
     st.dataframe(X)
     st.info(f"data after")
     st.dataframe(X)
-    X_df = X.copy()
-    # X is a dataframe, we should onvert it to a numpy to suit the LinearSVMInfluence and LogisticInfluence
+    # X is a dataframe, we should convert it to a numpy to suit the LinearSVMInfluence and LogisticInfluence
     X = X.values.astype(float)
     y = y.values.astype(float)
 
@@ -120,7 +115,7 @@ def prepare(X, y, X_index, model_type, target_column):
         # ToDo: change to frac
         X_train_infl = logistic_influence.average_influence(X_test[:10], y_test[:10])
 
-    X_train_raw = X_df.loc[train_index].copy().reset_index(drop=True)
+    X_train_raw = orginal_X.loc[train_index].copy().reset_index(drop=True)
 
     print(X_train_raw)
 
@@ -156,41 +151,47 @@ def fairness(df, model_type, target_column):
 
     # ToDO: with influence
     X_train_raw = prepare(
-        X=X,
-        y=y,
+        orginal_X=df.copy(),
+        X=X.copy(),
+        y=y.copy(),
         X_index=X_index,
         model_type=model_type,
         target_column=target_column_fairness,
     )
+    print(X_train_raw)
     top_patterns = evaluate_patterns(
         X_train_raw, min_support=0.05, top_k=5, max_predicates=1
     )
     st.info(f"top_patterns")
     st.dataframe(top_patterns)
+    print(top_patterns)
     print(print_pattern_table(top_patterns))
 
     # ToDO: without influence
 
     no_influence_top_patterns = []
     influence_top_patterns = []
-    print(X[sensitive_columns_fairness])
+    print(df[sensitive_columns_fairness])
     X_train, X_test, y_train, y_test, s_train_df, s_test_df = train_test_split(
-        X,
-        y,
-        X[sensitive_columns_fairness],
+        X.copy(),
+        y.copy(),
+        df[sensitive_columns_fairness],
         test_size=test_size,
         stratify=y,
         random_state=random_state,
     )
+
     model = train_model(X_train.values, y_train.values, model_type)
 
     for i in range(len(top_patterns)):
         influence_group_col = top_patterns.at[i, "pattern_col_1"]
         positive_group = top_patterns.at[i, "pattern_val_1"]
+        print(influence_group_col)
+        print(positive_group)
         _, _, _, _, group_train_df, _ = train_test_split(
-            X,
-            y,
-            X[influence_group_col],
+            X.copy(),
+            y.copy(),
+            df[influence_group_col],
             test_size=test_size,
             stratify=y,
             random_state=random_state,

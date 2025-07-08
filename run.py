@@ -74,7 +74,7 @@ def main():
     print("\nRunning quality and fairness analysis...")
     start_time = time.time()
     quality(df=df.copy(), model_type=model_type, target_column=target_column)
-    # fairness(df=df.copy(), model_type=model_type, target_column=target_column)
+    fairness(df=df.copy(), model_type=model_type, target_column=target_column)
     print("Analysis complete.")
     end_time = time.time()
     print(f"run time:{(end_time - start_time)/60} minutes")

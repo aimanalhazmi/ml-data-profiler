@@ -13,7 +13,7 @@ import os, sys
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, SRC)
 
-from influence.logistic_influence import LogisticInfluence
+from src.influence.logistic_influence import LogisticInfluence
 
 
 # group_train, is the training part of the column we want to compare. (e.g. "education")
@@ -101,7 +101,9 @@ def compute_fairness_metrics(
     # Get DPD and EOD per sensitive column. Then get PPV for each category inside the columns.
     records = []
     for sens in sens_cols:
-        sf_test = s_test_df[sens]
+        print(s_test_df[sens])
+        sf_test = s_test_df[sens].astype(str)
+        # sf_test = s_test_df[sens]
         dpd = demographic_parity_difference(
             y_true=y_test, y_pred=y_pred, sensitive_features=sf_test
         )
@@ -109,7 +111,9 @@ def compute_fairness_metrics(
             y_true=y_test, y_pred=y_pred, sensitive_features=sf_test
         )
         mf = MetricFrame(
-            metrics=precision_score,
+            metrics=lambda y_true, y_pred: precision_score(
+                y_true, y_pred, zero_division=0
+            ),
             y_true=y_test,
             y_pred=y_pred,
             sensitive_features=sf_test,
