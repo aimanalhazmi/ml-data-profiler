@@ -6,7 +6,6 @@ from src.model.train import train_model
 from src.model.registry import MODEL_REGISTRY
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
-from src.quality.with_influence import compute_influence
 from src.quality.compare import compare_outlier_removals
 from src.quality.clean import summarize_outliers
 from src.fairness.no_influence import compute_fairness_metrics
@@ -24,63 +23,6 @@ def preprocess_data(df, method, ohe, target_column):
     return processed_data_dict
 
 
-def quality_with_influence(df: pd.DataFrame, target_column, model_type: str):
-    random_state = 42
-    test_size = 0.2
-    frac = 0.01
-    st.info(model_type)
-    st.info(target_column)
-
-    le = LabelEncoder()
-    y = pd.Series(le.fit_transform(df[target_column]), index=df.index)
-    st.dataframe(y)
-
-    X = df.drop(columns=[target_column])
-    st.dataframe(X)
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, stratify=y, random_state=random_state
-    )
-
-    if frac < 1.0:
-        X_te = X_test.sample(frac=frac, random_state=42)
-        y_te = y_test.loc[X_te.index]
-    else:
-        X_te, y_te = X_test, y_test
-
-    # Train model
-    model = train_model(X_train, y_train, model_type)
-
-    # Calculate influence
-    influence_q = compute_influence(model, df, X_train, y_train, X_te, y_te)
-    st.dataframe(influence_q)
-
-    # Quality With influence
-    # quality_results = quality_with.check_quality()
-
-    # ToDO: Report findings and save in report_quality_check
-
-    report_quality_check = None
-    # ToDO: Clean Dataset based on influence
-    # cleaned_q_with = clean_data_quality()
-
-    # ToDo Train model after cleaning the dataset
-    parameters = {}
-    (
-        X_train_cleaned_q_with,
-        X_test_cleaned_q_with,
-        y_train_cleaned_q_witho,
-        y_test_cleaned_q_with,
-    ) = train_test_split(**parameters)
-
-    # model_q_with = train_model(X_train_cleaned_q_with, y_train_cleaned_q_witho, model_type)
-
-    # ToDo: report results (metrics) as dataframe
-    results_after_cleaning = None
-
-    return report_quality_check, results_after_cleaning
-
-
 def fairness_with_influence(df: pd.DataFrame, model_type: str):
 
     pass
@@ -88,9 +30,14 @@ def fairness_with_influence(df: pd.DataFrame, model_type: str):
 
 # @st.cache_data
 def quality(df, model_type, target_column):
+    test_size = 0.2
+    random_state = 42
+    alpha = 0.01
+    sigma_multiplier = 1.0
+
     # Quality
     df_q = preprocess_data(
-        df, method="data quality", ohe=False, target_column=target_column
+        df, method="data quality", ohe=True, target_column=target_column
     )
     df_quality = df_q[0]
     numeric_columns_quality = df_q[1]
@@ -99,51 +46,63 @@ def quality(df, model_type, target_column):
     sensitive_columns_quality = df_q[4]
     target_column_quality = df_q[5]
 
-    positive_class = random.choice(df[target_column].unique())
+    y = df_quality[target_column_quality]
+    X = df_quality.drop(columns=[target_column_quality])
+
     # train split, model(Class),
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, stratify=y, random_state=random_state
+    )
+    model = train_model(X_train.values, y_train.values, model_type)
+
     report1 = compare_outlier_removals(
-        df=df_quality,
+        X_train=X_train,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test,
         num_cols=numeric_columns_quality,
-        target_col=target_column,
-        positive_class=positive_class,
-        model=model_type,
+        model=model,
+        alpha=alpha,
+        sigma_multiplier=sigma_multiplier,
+        model_type=model_type,
     )
     st.dataframe(report1)
     print(report1)
     # train split, model(Class),
+
     outlier_summary = summarize_outliers(
-        df=df_quality,
+        X_train=X_train,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test,
         num_cols=numeric_columns_quality,
-        target_col=target_column,
-        positive_class=positive_class,
-        alpha=0.01,
-        sigma_multiplier=3.0,
+        model=model,
+        alpha=alpha,
+        sigma_multiplier=sigma_multiplier,
     )
+
     st.dataframe(outlier_summary)
     print(outlier_summary)
 
 
-def prepare(df, categorical_columns, model_type, target_column):
+def prepare(X, y, X_index, model_type, target_column):
     random_state = 42
     test_size = 0.2
 
-    st.dataframe(df[target_column])
-    le = LabelEncoder()
-    y = le.fit_transform(df[target_column])
     st.dataframe(y)
 
-    X = df.drop(columns=[target_column])
     st.info(f"data before")
     st.dataframe(X)
-    df_encoded = pd.get_dummies(X, columns=categorical_columns)
-    scaler = StandardScaler()
-    X_transformeed = scaler.fit_transform(df_encoded)
     st.info(f"data after")
-    st.dataframe(X_transformeed)
+    st.dataframe(X)
+    X_df = X.copy()
+    # X is a dataframe, we should onvert it to a numpy to suit the LinearSVMInfluence and LogisticInfluence
+    X = X.values.astype(float)
+    y = y.values.astype(float)
 
-    X_index = df.index
+    # If we split dataframe, it is still dataframe, if numpy then  numpy
     X_train, X_test, y_train, y_test, train_index, test_index = train_test_split(
-        X_transformeed,
+        X,
         y,
         X_index,
         test_size=test_size,
@@ -161,7 +120,7 @@ def prepare(df, categorical_columns, model_type, target_column):
         # ToDo: change to frac
         X_train_infl = logistic_influence.average_influence(X_test[:10], y_test[:10])
 
-    X_train_raw = df.loc[train_index].copy().reset_index(drop=True)
+    X_train_raw = X_df.loc[train_index].copy().reset_index(drop=True)
 
     print(X_train_raw)
 
@@ -173,21 +132,33 @@ def prepare(df, categorical_columns, model_type, target_column):
 # Fairness
 # @st.cache_data
 def fairness(df, model_type, target_column):
-    df_f = preprocess_data(
-        df, method="fairness", ohe=False, target_column=target_column
-    )
+    test_size = 0.2
+    random_state = 42
+    frac = 0.05
+    dpd_tol = 0.1
+    eod_tol = 0.1
+    ppv_tol = 0.1
+    influence_tol = 0.05
+
+    X_index = df.index
+    df_f = preprocess_data(df, method="fairness", ohe=True, target_column=target_column)
     df_fairness = df_f[0]
     numeric_columns_fairness = df_f[1]
     categorical_columns_fairness = df_f[2]
     text_columns_transformed_fairness = df_f[3]
     sensitive_columns_fairness = df_f[4]
     target_column_fairness = df_f[5]
-    positive_class = random.choice(df[target_column].unique())
+
+    y = df_fairness[target_column_fairness]
+    X = df_fairness.drop(
+        columns=[target_column_fairness]
+    )  # target_column or target_column_fairness
 
     # ToDO: with influence
     X_train_raw = prepare(
-        df=df_fairness.copy(),
-        categorical_columns=categorical_columns_fairness,
+        X=X,
+        y=y,
+        X_index=X_index,
         model_type=model_type,
         target_column=target_column_fairness,
     )
@@ -198,31 +169,48 @@ def fairness(df, model_type, target_column):
     st.dataframe(top_patterns)
     print(print_pattern_table(top_patterns))
 
-    # ToDo: influence_group_col positive_group
-
     # ToDO: without influence
 
     no_influence_top_patterns = []
     influence_top_patterns = []
+    print(X[sensitive_columns_fairness])
+    X_train, X_test, y_train, y_test, s_train_df, s_test_df = train_test_split(
+        X,
+        y,
+        X[sensitive_columns_fairness],
+        test_size=test_size,
+        stratify=y,
+        random_state=random_state,
+    )
+    model = train_model(X_train.values, y_train.values, model_type)
+
     for i in range(len(top_patterns)):
         influence_group_col = top_patterns.at[i, "pattern_col_1"]
         positive_group = top_patterns.at[i, "pattern_val_1"]
-
+        _, _, _, _, group_train_df, _ = train_test_split(
+            X,
+            y,
+            X[influence_group_col],
+            test_size=test_size,
+            stratify=y,
+            random_state=random_state,
+        )
         no_influence, influence = compute_fairness_metrics(
-            df=df_fairness.copy(),
-            target_col=target_column_fairness,
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            s_test_df=s_test_df,
             sens_cols=sensitive_columns_fairness,
-            model=model_type,
-            positive_class=positive_class,
-            influence_group_col=influence_group_col,
+            model=model,
+            group_train_df=group_train_df,
             positive_group=positive_group,
-            test_size=0.2,
-            random_state=912,
-            frac=0.05,
-            dpd_tol=0.1,
-            eod_tol=0.1,
-            ppv_tol=0.1,
-            influence_tol=0.05,
+            random_state=random_state,
+            frac=frac,
+            dpd_tol=dpd_tol,
+            eod_tol=eod_tol,
+            ppv_tol=ppv_tol,
+            influence_tol=influence_tol,
         )
         no_influence_top_patterns.append(no_influence)
         influence_top_patterns.append(influence)
