@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.errors import ParserError
 import numpy as np
 from datasets import load_dataset 
 from huggingface_hub import DatasetInfo, HfApi
@@ -6,6 +7,8 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 import os
 import openml
 import chardet
+import shutil
+import csv
 
 """
 
@@ -240,7 +243,32 @@ class KaggleIngestor(BaseIngestor):
         api.authenticate()
 
         file_name = self.get_name(dataset_id, self.file_index)
-        api.dataset_download_file(dataset_id, file_name=file_name, path=path)
+        print(file_name)
+        #api.dataset_download_file(dataset_id, file_name=file_name, path=path, force=True)
+        api.dataset_download_files(dataset_id, path=path, unzip=True)
+
+        src_path = None
+        for root, dirs, files in os.walk(path):
+            if file_name in files:
+                src_path = os.path.join(root, file_name)
+                break
+
+        if src_path is None:
+            raise FileNotFoundError(f"Could not find {file_name} after unzip in {path}")
+        
+        dst_path = os.path.join(path, file_name)
+        if src_path != dst_path:
+            shutil.move(src_path, dst_path)
+
+        for entry in os.listdir(path):
+            full = os.path.join(path, entry)
+            if entry == file_name:
+                continue
+            if os.path.isdir(full):
+                shutil.rmtree(full)
+            else:
+                os.remove(full)
+
 
 
     def get_name(self, dataset_id: str, file_index: int) -> str:
@@ -256,7 +284,8 @@ class KaggleIngestor(BaseIngestor):
         """
         api = KaggleApi()
         api.authenticate()
-        return(api.dataset_list_files(dataset_id).files[file_index].name)
+        raw_name = api.dataset_list_files(dataset_id).files[file_index].name
+        return os.path.basename(raw_name)
         
     def transform_raw_data(self, path: str, output_path: str, dataset_name: str) -> None:
         """
@@ -276,13 +305,32 @@ class KaggleIngestor(BaseIngestor):
 
         output_path = output_path + dataset_name.replace(ext, "") + ".csv"
 
+        """
         if ext == ".csv":
             try:
                 df = pd.read_csv(path)
             except UnicodeDecodeError:
+                sample = None
                 with open(path, 'rb') as f:
-                    result = chardet.detect(f.read(10000))
-                    df = pd.read_csv(path, encoding=result['encoding'])
+                    sample = f.read(10000)
+                detected = chardet.detect(sample)["encoding"]
+                df = pd.read_csv(path, encoding=detected, encoding_errors="replace")
+        """
+        if ext == ".csv" or ext == ".tsv":
+            with open(path, "rb") as f:
+                sample_bytes = f.read(10_000)
+            detected = chardet.detect(sample_bytes)["encoding"] or "utf-8"
+            sample_text = sample_bytes.decode(detected, errors="replace")
+            try:
+                dialect = csv.Sniffer().sniff(sample_text, delimiters=[",", ";", "\t", "|"])
+                sep = dialect.delimiter
+            except csv.Error:
+                sep = ";" if sample_text.count(";") > sample_text.count(",") else ","
+            df = pd.read_csv(path,
+                            sep=sep,
+                            encoding=detected,
+                            engine="python",          
+                            encoding_errors="replace")
         elif ext == ".tsv":
             df = pd.read_csv(path, sep="\t")
         elif ext == ".json":
