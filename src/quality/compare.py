@@ -11,20 +11,13 @@ from src.model.train import train_model
 
 # Trains and evaluates on original data, then again without statistical outliers and then once more without influence based outliers
 # model must be trained before. model_type is the model on which we calculate f1
-def compare_outlier_removals(
-    X_train,
-    X_test,
-    y_train,
-    y_test,
-    num_cols,
-    model,
-    alpha=0.01,
-    sigma_multiplier=1.0,
-    model_type="logistic",
-):
+def compare_outlier_removals(X_train, X_test, y_train, y_test, num_cols, model, alpha = 0.01, sigma_multiplier = 1.0, model_type='logistic'):
+    n_classes = y_test.nunique()
+    average = 'binary' if n_classes == 2 else 'macro'
+
     # train baseline on original data and get f1 score
     baseline = train_model(X_train, y_train, model_type)
-    f1_orig = f1_score(y_test, baseline.predict(X_test))
+    f1_orig = f1_score(y_test, baseline.predict(X_test), average=average)
 
     # train without statistical outliers and get f1
     stat_mask_full = mahalanobis_outliers(X_train, X_test, num_cols, alpha=alpha)
@@ -32,7 +25,7 @@ def compare_outlier_removals(
     X_train_stat = X_train.loc[~stat_train_mask]
     y_train_stat = y_train.loc[~stat_train_mask]
     stat_clf = train_model(X_train_stat, y_train_stat, model_type)
-    f1_statistic = f1_score(y_test, stat_clf.predict(X_test))
+    f1_statistic = f1_score(y_test, stat_clf.predict(X_test), average=average)
 
     # train without influence outliers and get f1
     infl_mask_full = influence_outliers(
@@ -49,7 +42,7 @@ def compare_outlier_removals(
     X_train_infl = X_train.loc[~infl_train_mask]
     y_train_infl = y_train.loc[~infl_train_mask]
     infl_clf = train_model(X_train_infl.values, y_train_infl.values, model_type)
-    f1_influence = f1_score(y_test, infl_clf.predict(X_test.values))
+    f1_influence = f1_score(y_test, infl_clf.predict(X_test.values), average=average)
 
     return pd.DataFrame(
         [
