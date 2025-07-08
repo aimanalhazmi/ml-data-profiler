@@ -41,7 +41,7 @@ SENSITIVE_KEYWORDS = {
 
     "socioeconomic": [
         "income", "salary", "wage", "employment_status",
-        "occupation", "education_level", "credit_score"
+        "occupation", "education_level", "credit_score",
     ]
 
 }
