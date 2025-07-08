@@ -11,9 +11,19 @@ from src.model.train import train_model
 
 # Trains and evaluates on original data, then again without statistical outliers and then once more without influence based outliers
 # model must be trained before. model_type is the model on which we calculate f1
-def compare_outlier_removals(X_train, X_test, y_train, y_test, num_cols, model, alpha = 0.01, sigma_multiplier = 1.0, model_type='logistic'):
+def compare_outlier_removals(
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+    num_cols,
+    model,
+    alpha=0.01,
+    sigma_multiplier=1.0,
+    model_type="logistic",
+):
     n_classes = y_test.nunique()
-    average = 'binary' if n_classes == 2 else 'macro'
+    average = "binary" if n_classes == 2 else "weighted"
 
     # train baseline on original data and get f1 score
     baseline = train_model(X_train, y_train, model_type)
