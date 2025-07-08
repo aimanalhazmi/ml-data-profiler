@@ -8,29 +8,15 @@ import os, sys
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, SRC)
 
+from no_influence import mahalanobis_outliers
+from with_influence import influence_outliers
 
 # For Report #1
-def summarize_outliers(
-    df,
-    num_cols,
-    target_col,
-    positive_class,
-    alpha=0.01,
-    sigma_multiplier=3.0,
-    model="logistic",
-):
-    m_mask = mahalanobis_outliers(df, num_cols, alpha=alpha)
-    i_mask = influence_outliers(
-        df,
-        target_col=target_col,
-        positive_class=positive_class,
-        frac=0.01,
-        test_size=0.2,
-        random_state=912,
-        sigma_multiplier=sigma_multiplier,
-        model=model,
-    )
-    total = len(df)
+# Model must be trained
+def summarize_outliers(X_train, X_test, y_train, y_test, model, num_cols, alpha=0.01, sigma_multiplier = 1.0):
+    m_mask = mahalanobis_outliers(X_train, X_test, num_cols, alpha=alpha)
+    i_mask = influence_outliers(X_train, X_test, y_train, y_test, model, frac = 0.001, random_state= 912, sigma_multiplier = sigma_multiplier)
+    total = len(X_train) + len(X_test)
 
     inf_count = i_mask.sum()
     inf_pct = inf_count / total * 100
@@ -53,23 +39,16 @@ def summarize_outliers(
 
 
 # return df without rows flagged by Mahalanobis
-def drop_statistic_outliers(df, num_cols, alpha=0.01):
-    mask = mahalanobis_outliers(df, num_cols, alpha=alpha)
-    return df.loc[~mask].copy()
+def drop_statistic_outliers(X_train, X_test, num_cols, alpha=0.01):
+    full = pd.concat([X_train, X_test])
+    mask = mahalanobis_outliers(X_train, X_test, num_cols, alpha=alpha)
+    return full.loc[~mask].copy()
 
 
 # return df without rows flagged by Influence‐based method
-def drop_influence_outliers(
-    df, target_col, positive_class, sigma_multiplier=3.0, model="logistic"
-):
-    mask = influence_outliers(
-        df,
-        target_col=target_col,
-        positive_class=positive_class,
-        frac=0.01,
-        test_size=0.2,
-        random_state=912,
-        sigma_multiplier=sigma_multiplier,
-        model=model,
-    )
-    return df.loc[~mask].copy()
+# Model must be trained
+def drop_influence_outliers(X_train, X_test, y_train, y_test, model, sigma_multiplier = 1.0):
+    full = pd.concat([X_train, X_test])
+    mask = influence_outliers(X_train, X_test, y_train, y_test, model, frac = 0.001, random_state= 912, sigma_multiplier = sigma_multiplier)
+    return full.loc[~mask].copy()
+

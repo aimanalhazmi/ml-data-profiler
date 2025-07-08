@@ -9,8 +9,12 @@ from pyod.models.kpca import KPCA
 #  α = 0.01 means we flag any point that lies outside the
 #  99% confidence ellipsoid under a multivariate normal
 #  assumption like sayun p-value < 0.01.
-def mahalanobis_outliers(df, num_cols, alpha = 0.01):
-    X = df[num_cols].values
+
+# Just the X_train and X_test, maybe the df
+
+def mahalanobis_outliers(X_train, X_test, num_cols, alpha = 0.01):
+    full = pd.concat([X_train, X_test])
+    X = full[num_cols].values
     mu = X.mean(axis=0)
     cov = np.cov(X, rowvar=False)
     cov_inv = np.linalg.inv(cov)
@@ -24,8 +28,9 @@ def mahalanobis_outliers(df, num_cols, alpha = 0.01):
 #  within eps of each other are considered neighbors.
 #  min_samples ist minimum number of neighbors required to
 #  form a cluster. Anything not in a cluster is outlier.
-def dbscan_outliers(df, num_cols, eps = 0.5, min_samples = 5):
-    X = df[num_cols].values
+def dbscan_outliers(X_train, X_test, num_cols, eps = 0.5, min_samples = 5):
+    full = pd.concat([X_train, X_test])
+    X = full[num_cols].values
     Xs = StandardScaler().fit_transform(X)
     db = DBSCAN(eps=eps, min_samples=min_samples).fit(Xs)
     return db.labels_ == -1
