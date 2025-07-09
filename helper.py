@@ -11,12 +11,12 @@ import time
 
 
 def preprocess_data(df, method, ohe, target_column, streamlit_active):
-    log_info(
-        streamlit_active=streamlit_active,
-        msg=f"Preprocessing for {method} pipeline...",
-    )
     preprocessor_factory = PreprocessorFactory(
         data=df, method=method, target_column=target_column
+    )
+    log_info(
+        streamlit_active=streamlit_active,
+        msg=f"Data preprocessing for the {method} pipeline completed.",
     )
     preprocessor = preprocessor_factory.create()
     processed_data_dict = preprocessor.process_data(ohe=ohe)
@@ -270,17 +270,25 @@ def fairness(df, model_type, target_column):
         no_influence_top_patterns.append(no_influence)
         influence_top_patterns.append(influence)
 
-        # Flatten and summarize no_influence results
-        print("\n=== Fairness (No Influence) ===")
-        print_no_influence_top_patterns(no_influence)
-        print("\n=== Fairness (With Influence) ===")
-        print_one_influence_top_patterns(influence)
+        # # Flatten and summarize no_influence results
+        # print("\n=== Fairness (No Influence) ===")
+        # print_no_influence_top_patterns(no_influence)
+        # print("\n=== Fairness (With Influence) ===")
+        # print_one_influence_top_patterns(influence)
 
-    # print("\n=== Fairness (No Influence) ===")
-    # print_no_influence_top_patterns(no_influence_top_patterns[0])
-    # print_influence_top_patterns(influence_top_patterns)
+    print("\n=== Fairness (No Influence) ===")
+    no_influence_summary = print_no_influence_top_patterns(
+        no_influence_top_patterns[0], streamlit_active
+    )
+    influence_summary = print_influence_top_patterns(
+        influence_top_patterns, streamlit_active
+    )
 
-    fairness_results = []
+    fairness_results = [
+        ("Top Patterns", top_patterns_display),
+        ("Fairness (No Influence)", no_influence_summary),
+        ("Fairness (With Influence)", influence_summary),
+    ]
 
     log_step_end(
         streamlit_active=streamlit_active, name="Fairness", start_time=fairness_start

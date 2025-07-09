@@ -2,6 +2,10 @@ import streamlit as st
 import time
 from tabulate import tabulate
 import pandas as pd
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
 
 
 def log_step_start(streamlit_active, name):
@@ -13,13 +17,18 @@ def log_step_start(streamlit_active, name):
 
 def log_info(streamlit_active, msg):
     if streamlit_active:
-        st.info(msg)
+        st.success(msg)
     else:
         print(msg)
 
 
-def color_bool(val):
-    return f"\033[92m{val}\033[0m" if val else f"\033[91m{val}\033[0m"
+def color_bool(val, streamlit_active=False):
+    if streamlit_active:
+        color = "green" if val else "red"
+        css = f'<span style="color:{color}">{val}</span>'
+        return val
+    else:
+        return f"\033[92m{val}\033[0m" if val else f"\033[91m{val}\033[0m"
 
 
 def is_streamlit_active():
@@ -113,7 +122,7 @@ def display_outlier_summary(summary_df, streamlit_active=False):
     return display_df
 
 
-def print_influence_top_patterns(influence_top_patterns: list[dict]):
+def print_influence_top_patterns(influence_top_patterns: list[dict], streamlit_active):
     influence_summary = []
     for pattern in influence_top_patterns:
         influence_summary.append(
@@ -123,14 +132,17 @@ def print_influence_top_patterns(influence_top_patterns: list[dict]):
                 "Mean (Positive)": round(float(pattern["mean_pos"]), 8),
                 "Mean (Other)": round(float(pattern["mean_other"]), 8),
                 "Mean Difference": round(float(pattern["Inf_mean_diff"]), 8),
-                "Influence Fair": color_bool(bool(pattern["Inf_fair"])),
+                "Influence Fair": color_bool(
+                    bool(pattern["Inf_fair"]), streamlit_active
+                ),
             }
         )
     print("\n=== Fairness (With Influence) ===")
     print(tabulate(influence_summary, headers="keys", tablefmt="grid"))
+    return pd.DataFrame(influence_summary)
 
 
-def print_one_influence_top_patterns(influence_top_patterns: dict):
+def print_one_influence_top_patterns(influence_top_patterns: dict, streamlit_active):
     influence_summary = [
         {
             "Influence Group": influence_top_patterns["group_col"],
@@ -138,7 +150,9 @@ def print_one_influence_top_patterns(influence_top_patterns: dict):
             "Mean (Positive)": f"{float(influence_top_patterns['mean_pos']):.8f}",
             "Mean (Other)": f"{float(influence_top_patterns['mean_other']):.8f}",
             "Mean Difference": f"{float(influence_top_patterns['Inf_mean_diff']):.8f}",
-            "Influence Fair": color_bool(bool(influence_top_patterns["Inf_fair"])),
+            "Influence Fair": color_bool(
+                bool(influence_top_patterns["Inf_fair"]), streamlit_active
+            ),
         }
     ]
     print(
@@ -148,21 +162,24 @@ def print_one_influence_top_patterns(influence_top_patterns: dict):
     )
 
 
-def print_no_influence_top_patterns(no_influence_top_patterns: list[dict]):
+def print_no_influence_top_patterns(
+    no_influence_top_patterns: list[dict], streamlit_active
+):
     no_influence_summary = []
     for pattern in no_influence_top_patterns:
         no_influence_summary.append(
             {
                 "Sensitive Feature": pattern["sensitive_feature"],
                 "DPD": round(float(pattern["DPD"]), 4),
-                "DPD Fair": color_bool(bool(pattern["DPD_fair"])),
+                "DPD Fair": color_bool(bool(pattern["DPD_fair"]), streamlit_active),
                 "EOD": round(float(pattern["EOD"]), 4),
-                "EOD Fair": color_bool(bool(pattern["EOD_fair"])),
+                "EOD Fair": color_bool(bool(pattern["EOD_fair"]), streamlit_active),
                 "PPV Diff": round(float(pattern["PPV_diff"]), 4),
-                "PPV Fair": color_bool(bool(pattern["PPV_fair"])),
+                "PPV Fair": color_bool(bool(pattern["PPV_fair"]), streamlit_active),
             }
         )
     print(tabulate(no_influence_summary, headers="keys", tablefmt="grid"))
+    return pd.DataFrame(no_influence_summary)
 
 
 def print_pattern_table(df_patterns):
@@ -194,3 +211,38 @@ def pattern_to_readable(pattern, columns):
         else:
             readable.append(f"{col_name} = {val}")
     return readable
+
+
+def add_section(title, results, elements, styles):
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph(f"<b>{title}</b>", styles["Heading2"]))
+    for section_title, df in results:
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(section_title, styles["Heading4"]))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            data = [df.columns.tolist()] + df.astype(str).values.tolist()
+            table = Table(data, hAlign="LEFT")
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ]
+                )
+            )
+            elements.append(table)
+        else:
+            elements.append(Paragraph("No data.", styles["Normal"]))
+        elements.append(Spacer(1, 6))
+
+
+def save_results_to_pdf(filepath, quality_results, fairness_results):
+    doc = SimpleDocTemplate(filepath, pagesize=A4)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    add_section("📊 Quality Results", quality_results, elements, styles)
+    add_section("⚖️ Fairness Results", fairness_results, elements, styles)
+
+    doc.build(elements)

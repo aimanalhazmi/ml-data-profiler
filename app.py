@@ -5,19 +5,30 @@ from src.ingestion.loader import load_dataset
 from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
 from src.model.registry import MODEL_REGISTRY
+from src.utils.output import save_results_to_pdf
 from helper import quality, fairness
 
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
 
 # Dataset Input
-url = st.text_input("Enter dataset URL (OpenML, Kaggle, HuggingFace)")
+input_method = st.radio("Choose dataset input method", ("URL", "Upload CSV"))
 
-if st.button("Load Dataset") and url:
-    with st.spinner("Loading dataset..."):
-        df = load_dataset(url)
+if input_method == "URL":
+    url = st.text_input("Enter dataset URL (OpenML, Kaggle, HuggingFace)")
+    if st.button("Load Dataset") and url:
+        with st.spinner("Loading dataset..."):
+            df = load_dataset(url)
+            st.session_state.df = df
+        st.success("Dataset loaded successfully!")
+
+elif input_method == "Upload CSV":
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
         st.session_state.df = df
-    st.success("Dataset loaded successfully!")
+        st.success("CSV file loaded successfully!")
+
 
 # Show dataset and stats
 if "df" in st.session_state:
@@ -98,6 +109,23 @@ if "df" in st.session_state:
             )
 
 
+@st.cache_data
+def run_quality_analysis(df, model_type, target_column):
+    return quality(df.copy(), model_type, target_column)
+
+
+@st.cache_data
+def run_fairness_analysis(df, model_type, target_column):
+    return fairness(df.copy(), model_type, target_column)
+
+
+def display_result_section(title, results):
+    with st.expander(title, expanded=True):
+        for section_title, df_section in results:
+            st.subheader(section_title)
+            st.dataframe(df_section)
+
+
 # Model Selection
 if "df" in st.session_state and st.session_state.target_column:
     st.markdown("---")
@@ -120,57 +148,61 @@ if "df" in st.session_state and st.session_state.target_column:
         )
         st.session_state.model = MODEL_REGISTRY[supported_models[0]]
 
-    if st.button("Train Model and Compute Influence"):
-        with st.spinner("Running analysis..."):
+    # User-defined sampling
+    use_sample = st.checkbox("Sample dataset before training", value=True)
+    sample_frac = 0.25  # default
 
-            # Quality
-            st.subheader("Quality")
-            st.session_state.quality_results = quality(
-                df=df.copy(),
-                model_type=st.session_state.model,
-                target_column=target_column,
+    if use_sample:
+        sample_frac = (
+            st.slider(
+                "Sampling fraction (%)", min_value=5, max_value=100, value=25, step=5
             )
-            # Fairness
-            st.subheader("Fairness")
-            fairness(
-                df=df.copy(),
-                model_type=st.session_state.model,
-                target_column=target_column,
+            / 100
+        )
+        reduced_df = df.sample(frac=sample_frac, random_state=42)
+        st.info(
+            f"Using {int(sample_frac * 100)}% of the dataset for training and analysis."
+        )
+    else:
+        reduced_df = df
+
+    st.session_state.setdefault("quality_results", None)
+    st.session_state.setdefault("fairness_results", None)
+    if st.button("Train Model & Run Quality"):
+        st.session_state.quality_results = None
+        with st.spinner("Running quality pipeline..."):
+            st.session_state.quality_results = run_quality_analysis(
+                reduced_df.copy(), st.session_state.model, target_column
             )
-        st.success("Computed!")
+        # st.success("✅ Quality pipeline completed.")
+    if st.session_state.quality_results:
+        display_result_section("📊 Quality Results", st.session_state.quality_results)
 
+    if st.session_state.quality_results:
+        if st.button("Run Fairness Analysis"):
+            st.session_state.fairness_results = None
+            with st.spinner("Running fairness pipeline..."):
+                st.session_state.fairness_results = run_fairness_analysis(
+                    reduced_df.copy(), st.session_state.model, target_column
+                )
+            # st.success("✅ Fairness analysis completed.")
 
-# if st.button("Show Quality & Fairness Results"):
-#     st.subheader("Quality")
-#     st.json(st.session_state.quality_results)
-#
-#     st.subheader("Fairness")
-#     st.json(st.session_state.fairness_results)
-
-
-# # Quality & Fairness
-# if "influence_df" in st.session_state:
-#     st.markdown("---")
-#     if st.button("Run Quality and Fairness Checks"):
-#         with st.spinner("Running analysis..."):
-#             # Replace with quality and fairness modules
-#             quality = {"missing_values": "None", "outliers": "Detected"}
-#             fairness = {"demographic_parity": 0.12, "equal_opportunity": 0.08}
-#             st.session_state.quality = quality
-#             st.session_state.fairness = fairness
-#         st.success("Analysis complete!")
-#         st.subheader("Data Quality Summary")
-#         st.json(quality)
-#         st.subheader("Fairness Metrics")
-#         st.json(fairness)
+    # Show fairness results
+    if st.session_state.fairness_results:
+        display_result_section("⚖️ Fairness Results", st.session_state.fairness_results)
 
 # Final Report Viewer
-if "quality" in st.session_state and "fairness" in st.session_state:
+if "quality_results" in st.session_state and "fairness_results" in st.session_state:
     st.markdown("---")
     if st.button("Generate Final Report"):
         with st.spinner("Generating report..."):
-            # Replace this with real report generation
-            report_path = "outputs/test_report.pdf"
+            report_path = "outputs/final_report.pdf"
+            os.makedirs(os.path.dirname(report_path), exist_ok=True)
+            save_results_to_pdf(
+                filepath=report_path,
+                quality_results=st.session_state.quality_results,
+                fairness_results=st.session_state.fairness_results,
+            )
             st.session_state.report_path = report_path
         st.success("Report generated!")
 
