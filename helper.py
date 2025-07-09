@@ -70,17 +70,6 @@ def quality(df, model_type, target_column):
         sigma_multiplier=sigma_multiplier,
         model_type=model_type,
     )
-    # report1_column_map = {
-    #     "f1_orig": "F1 Score (Original)",
-    #     "f1_statistic": "F1 Score (Statistic)",
-    #     "f1_influence": "F1 Score (Influence)",
-    # }
-    # report1_display = report1.rename(columns=report1_column_map)
-    # if streamlit_active:
-    #     st.dataframe(report1_display.style.format(precision=4))
-    # else:
-    #     print("\n=== F1 Score Report ===")
-    #     print(report1_display.round(4).to_string(index=False))
 
     report1_display = display_f1_report(report1, streamlit_active=streamlit_active)
 
@@ -98,34 +87,6 @@ def quality(df, model_type, target_column):
     summary_display = display_outlier_summary(
         outlier_summary, streamlit_active=streamlit_active
     )
-
-    # summary_column_map = {
-    #     "Influence_outliers_count": "Influence Outliers (Count)",
-    #     "Influence_outliers_%": "Influence Outliers (%)",
-    #     "Mahalanobis_outliers_count": "Mahalanobis Outliers (Count)",
-    #     "Mahalanobis_outliers_%": "Mahalanobis Outliers (%)",
-    #     "Overlap_count": "Overlap (Count)",
-    # }
-    # summary_display = outlier_summary.rename(columns=summary_column_map)
-    #
-    # if streamlit_active:
-    #     st.dataframe(
-    #         summary_display.style.format(
-    #             {
-    #                 "Influence Outliers (%)": "{:.2%}",
-    #                 "Mahalanobis Outliers (%)": "{:.2%}",
-    #             }
-    #         )
-    #     )
-    # else:
-    #     print("\n=== Outlier Summary ===")
-    #     summary_display["Influence Outliers (%)"] = summary_display[
-    #         "Influence Outliers (%)"
-    #     ].map("{:.2%}".format)
-    #     summary_display["Mahalanobis Outliers (%)"] = summary_display[
-    #         "Mahalanobis Outliers (%)"
-    #     ].map("{:.2%}".format)
-    #     print(summary_display.to_string(index=False))
 
     quality_results = [
         ("F1 Score Report", report1_display),
