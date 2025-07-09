@@ -75,7 +75,7 @@ def compute_fairness_metrics(
     model,
     group_train_df,
     positive_group,
-    random_state=912,
+    random_state=42,
     frac=0.001,
     dpd_tol=0.1,
     eod_tol=0.1,
@@ -101,7 +101,6 @@ def compute_fairness_metrics(
     # Get DPD and EOD per sensitive column. Then get PPV for each category inside the columns.
     records = []
     for sens in sens_cols:
-        print(s_test_df[sens])
         sf_test = s_test_df[sens].astype(str)
         # sf_test = s_test_df[sens]
         dpd = demographic_parity_difference(

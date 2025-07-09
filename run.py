@@ -6,6 +6,8 @@ from src.model.registry import MODEL_REGISTRY
 from helper import quality, fairness
 import warnings
 from sklearn.exceptions import ConvergenceWarning
+from tabulate import tabulate
+from src.utils.output import display_alerts
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 import time
@@ -26,14 +28,17 @@ def main():
 
     # Dataset Summary
     print("=== Dataset Summary ===")
-    summary = stats.get_dataset_summary(df)
-    print(summary)
+    overview_summary = stats.dataset_summary(df)
+    print(tabulate(overview_summary, headers="keys", tablefmt="grid", showindex=False))
 
     # Column Types
+    print("\n=== Column Type Summary ===")
     dqp = DQP(df, target_column="")
-    col_summary = stats.get_column_type_summary(dqp)
-    print("\n=== Column Types ===")
-    print(col_summary)
+    col_summary = stats.print_column_type_summary_terminal(dqp)
+
+    # Display alerts
+    alerts = stats.get_alerts(df)
+    display_alerts(alerts)
 
     # Target Column Selection
     numeric_columns, categorical_columns = dqp.receive_categorized_columns()
@@ -71,20 +76,26 @@ def main():
     print(f"Model selected: {selected_model} | Target column: {target_column}")
 
     # Run Quality and Fairness
-    print("\nRunning quality and fairness analysis...")
     start_time = time.time()
-    quality(df=df.copy(), model_type=model_type, target_column=target_column)
-    fairness(df=df.copy(), model_type=model_type, target_column=target_column)
-    print("Analysis complete.")
-    end_time = time.time()
-    print(f"run time:{(end_time - start_time)/60} minutes")
+    print("\nRunning analysis...")
+    quality_results = quality(
+        df=df.copy(), model_type=model_type, target_column=target_column
+    )
+    fairness_results = fairness(
+        df=df.copy(), model_type=model_type, target_column=target_column
+    )
+    print("\nAnalysis complete.")
 
-    # Generate Report
-    report_path = "outputs/test_report.pdf"
-    if os.path.exists(report_path):
-        print(f"Report generated: {report_path}")
-    else:
-        print("No report file found (placeholder).")
+    # # Generate Report
+    # report_path = "outputs/test_report.pdf"
+    # if os.path.exists(report_path):
+    #     print(f"Report generated: {report_path}")
+    # else:
+    #     print("No report file found (placeholder).")
+
+    total_time = (time.time()) - start_time
+    print("\n=== Program Complete ===")
+    print(f"Total run time: {total_time:.2f} seconds ({total_time / 60:.2f} minutes)")
 
 
 if __name__ == "__main__":

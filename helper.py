@@ -1,27 +1,26 @@
 from src.preprocessing.preprocessing import PreprocessorFactory
-from streamlit import streamlit as st
-import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.model.train import train_model
 from src.quality.compare import compare_outlier_removals
 from src.quality.clean import summarize_outliers
 from src.fairness.no_influence import compute_fairness_metrics
-from src.fairness.with_influence import evaluate_patterns, print_pattern_table
+from src.fairness.with_influence import evaluate_patterns
 from src.influence.logistic_influence import LinearSVMInfluence, LogisticInfluence
+from src.utils.output import *
+import time
 
 
-def preprocess_data(df, method, ohe, target_column):
+def preprocess_data(df, method, ohe, target_column, streamlit_active):
+    log_info(
+        streamlit_active=streamlit_active,
+        msg=f"Preprocessing for {method} pipeline...",
+    )
     preprocessor_factory = PreprocessorFactory(
         data=df, method=method, target_column=target_column
     )
     preprocessor = preprocessor_factory.create()
     processed_data_dict = preprocessor.process_data(ohe=ohe)
     return processed_data_dict
-
-
-def fairness_with_influence(df: pd.DataFrame, model_type: str):
-
-    pass
 
 
 # @st.cache_data
@@ -32,9 +31,18 @@ def quality(df, model_type, target_column):
     sigma_multiplier = 1.0
 
     # Quality
+    streamlit_active = is_streamlit_active()
+    log_step_start(streamlit_active=streamlit_active, name="Quality")
+    quality_start = time.time()
+
     df_q = preprocess_data(
-        df, method="data quality", ohe=True, target_column=target_column
+        df,
+        method="data quality",
+        ohe=True,
+        target_column=target_column,
+        streamlit_active=streamlit_active,
     )
+
     df_quality = df_q[0]
     numeric_columns_quality = df_q[1]
     categorical_columns_quality = df_q[2]
@@ -62,9 +70,19 @@ def quality(df, model_type, target_column):
         sigma_multiplier=sigma_multiplier,
         model_type=model_type,
     )
-    st.dataframe(report1)
-    print(report1)
-    # train split, model(Class),
+    # report1_column_map = {
+    #     "f1_orig": "F1 Score (Original)",
+    #     "f1_statistic": "F1 Score (Statistic)",
+    #     "f1_influence": "F1 Score (Influence)",
+    # }
+    # report1_display = report1.rename(columns=report1_column_map)
+    # if streamlit_active:
+    #     st.dataframe(report1_display.style.format(precision=4))
+    # else:
+    #     print("\n=== F1 Score Report ===")
+    #     print(report1_display.round(4).to_string(index=False))
+
+    report1_display = display_f1_report(report1, streamlit_active=streamlit_active)
 
     outlier_summary = summarize_outliers(
         X_train=X_train,
@@ -77,20 +95,52 @@ def quality(df, model_type, target_column):
         sigma_multiplier=sigma_multiplier,
     )
 
-    st.dataframe(outlier_summary)
-    print(outlier_summary)
+    summary_display = display_outlier_summary(
+        outlier_summary, streamlit_active=streamlit_active
+    )
+
+    # summary_column_map = {
+    #     "Influence_outliers_count": "Influence Outliers (Count)",
+    #     "Influence_outliers_%": "Influence Outliers (%)",
+    #     "Mahalanobis_outliers_count": "Mahalanobis Outliers (Count)",
+    #     "Mahalanobis_outliers_%": "Mahalanobis Outliers (%)",
+    #     "Overlap_count": "Overlap (Count)",
+    # }
+    # summary_display = outlier_summary.rename(columns=summary_column_map)
+    #
+    # if streamlit_active:
+    #     st.dataframe(
+    #         summary_display.style.format(
+    #             {
+    #                 "Influence Outliers (%)": "{:.2%}",
+    #                 "Mahalanobis Outliers (%)": "{:.2%}",
+    #             }
+    #         )
+    #     )
+    # else:
+    #     print("\n=== Outlier Summary ===")
+    #     summary_display["Influence Outliers (%)"] = summary_display[
+    #         "Influence Outliers (%)"
+    #     ].map("{:.2%}".format)
+    #     summary_display["Mahalanobis Outliers (%)"] = summary_display[
+    #         "Mahalanobis Outliers (%)"
+    #     ].map("{:.2%}".format)
+    #     print(summary_display.to_string(index=False))
+
+    quality_results = [
+        ("F1 Score Report", report1_display),
+        ("Outlier Summary", summary_display),
+    ]
+    log_step_end(
+        streamlit_active=streamlit_active, name="Quality", start_time=quality_start
+    )
+    return quality_results
 
 
 def prepare(orginal_X, X, y, X_index, model_type, target_column):
     random_state = 42
     test_size = 0.2
 
-    st.dataframe(y)
-
-    st.info(f"data before")
-    st.dataframe(X)
-    st.info(f"data after")
-    st.dataframe(X)
     # X is a dataframe, we should convert it to a numpy to suit the LinearSVMInfluence and LogisticInfluence
     X = X.values.astype(float)
     y = y.values.astype(float)
@@ -117,8 +167,6 @@ def prepare(orginal_X, X, y, X_index, model_type, target_column):
 
     X_train_raw = orginal_X.loc[train_index].copy().reset_index(drop=True)
 
-    print(X_train_raw)
-
     X_train_raw["influence"] = X_train_infl
 
     return X_train_raw
@@ -135,8 +183,18 @@ def fairness(df, model_type, target_column):
     ppv_tol = 0.1
     influence_tol = 0.05
 
+    streamlit_active = is_streamlit_active()
+    log_step_start(streamlit_active=streamlit_active, name="Fairness")
+    fairness_start = time.time()
+
     X_index = df.index
-    df_f = preprocess_data(df, method="fairness", ohe=True, target_column=target_column)
+    df_f = preprocess_data(
+        df,
+        method="fairness",
+        ohe=True,
+        target_column=target_column,
+        streamlit_active=streamlit_active,
+    )
     df_fairness = df_f[0]
     numeric_columns_fairness = df_f[1]
     categorical_columns_fairness = df_f[2]
@@ -158,20 +216,53 @@ def fairness(df, model_type, target_column):
         model_type=model_type,
         target_column=target_column_fairness,
     )
-    print(X_train_raw)
     top_patterns = evaluate_patterns(
         X_train_raw, min_support=0.05, top_k=5, max_predicates=1
     )
-    st.info(f"top_patterns")
-    st.dataframe(top_patterns)
-    print(top_patterns)
-    print(print_pattern_table(top_patterns))
+
+    top_patterns_column_map = {
+        "pattern_col_1": "Pattern Column 1",
+        "pattern_val_1": "Pattern Value 1",
+        "pattern_col_2": "Pattern Column 2",
+        "pattern_val_2": "Pattern Value 2",
+        "support": "Support",
+        "responsibility": "Responsibility",
+        "interestingness": "Interestingness",
+    }
+
+    top_patterns_display = top_patterns.rename(columns=top_patterns_column_map)
+
+    if streamlit_active:
+        if streamlit_active:
+            st.markdown("Top Patterns")
+            st.dataframe(
+                top_patterns_display.style.format(
+                    {
+                        "Support": "{:.4f}",
+                        "Responsibility": "{:.4f}",
+                        "Interestingness": "{:.4f}",
+                    }
+                )
+            )
+
+    else:
+        print("\n=== Top Patterns ===")
+        print(
+            tabulate(
+                top_patterns_display.round(
+                    {"Support": 4, "Responsibility": 4, "Interestingness": 4}
+                ),
+                headers="keys",
+                tablefmt="grid",
+                showindex=False,
+            )
+        )
+        # print(print_pattern_table(top_patterns))
 
     # ToDO: without influence
 
     no_influence_top_patterns = []
     influence_top_patterns = []
-    print(df[sensitive_columns_fairness])
     X_train, X_test, y_train, y_test, s_train_df, s_test_df = train_test_split(
         X.copy(),
         y.copy(),
@@ -186,8 +277,9 @@ def fairness(df, model_type, target_column):
     for i in range(len(top_patterns)):
         influence_group_col = top_patterns.at[i, "pattern_col_1"]
         positive_group = top_patterns.at[i, "pattern_val_1"]
-        print(influence_group_col)
-        print(positive_group)
+        print(
+            f"\nPattern [{i+1}]: Influence Group Column: {influence_group_col}, Positive Group: {positive_group}"
+        )
         _, _, _, _, group_train_df, _ = train_test_split(
             X.copy(),
             y.copy(),
@@ -213,14 +305,23 @@ def fairness(df, model_type, target_column):
             ppv_tol=ppv_tol,
             influence_tol=influence_tol,
         )
+
         no_influence_top_patterns.append(no_influence)
         influence_top_patterns.append(influence)
 
-    st.markdown("no_influence")
-    st.dataframe(no_influence_top_patterns)
-    st.markdown("influence")
-    st.dataframe(influence_top_patterns)
-    print("no_influence")
-    print(no_influence_top_patterns)
-    print("influence")
-    print(influence_top_patterns)
+        # Flatten and summarize no_influence results
+        print("\n=== Fairness (No Influence) ===")
+        print_no_influence_top_patterns(no_influence)
+        print("\n=== Fairness (With Influence) ===")
+        print_one_influence_top_patterns(influence)
+
+    # print("\n=== Fairness (No Influence) ===")
+    # print_no_influence_top_patterns(no_influence_top_patterns[0])
+    # print_influence_top_patterns(influence_top_patterns)
+
+    fairness_results = []
+
+    log_step_end(
+        streamlit_active=streamlit_active, name="Fairness", start_time=fairness_start
+    )
+    return fairness_results

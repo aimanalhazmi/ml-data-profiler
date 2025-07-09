@@ -31,8 +31,8 @@ if "df" in st.session_state:
 
         with col1:
             st.subheader("Dataset Summary")
-            summary = stats.get_dataset_summary(df)
-            st.markdown(summary)
+            summary = stats.dataset_summary(df)
+            st.markdown(stats.get_markdown_dataset_summary(summary))
 
         with col2:
             st.subheader("Column Analysis")

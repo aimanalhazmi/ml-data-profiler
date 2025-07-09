@@ -2,51 +2,56 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 from src.preprocessing.preprocessing import Preprocessor as DQP
+from tabulate import tabulate
 
 
-def generate_stats(df: pd.DataFrame, target_col, sensitive_col):
-    pass
-
-
-def dataset_summary(df: pd.DataFrame) -> dict:
+def dataset_summary(df: pd.DataFrame) -> pd.DataFrame:
     """Return general dataset statistics."""
+    num_rows, num_cols = df.shape
     total_cells = df.size
     missing_cells = df.isna().sum().sum()
     duplicated_rows = df.duplicated().sum()
-    memory = df.memory_usage(deep=True).sum()
-    return {
-        "number_of_columns": df.shape[1],
-        "number_of_records": df.shape[0],
-        "total_cells": int(total_cells),
-        "missing_cells": int(missing_cells),
-        "missing_percentage": round(missing_cells / total_cells * 100, 2),
-        "duplicate_records": int(duplicated_rows),
-        "duplicate_percentage": round(duplicated_rows / df.shape[0] * 100, 2),
-        "memory_usage_kb": round(memory / 1024, 2),
-        "average_record_size_bytes": round(memory / df.shape[0], 2),
-    }
+    memory_bytes = df.memory_usage(deep=True).sum()
+
+    data = [
+        ["Number of Columns", num_cols],
+        ["Number of Records", num_rows],
+        ["Total Cells", int(total_cells)],
+        ["Missing Cells", int(missing_cells)],
+        [
+            "Missing Percentage",
+            f"{(missing_cells / total_cells * 100):.2f}%" if total_cells else "0.00%",
+        ],
+        ["Duplicate Records", int(duplicated_rows)],
+        [
+            "Duplicate Percentage",
+            f"{(duplicated_rows / num_rows * 100):.2f}%" if num_rows else "0.00%",
+        ],
+        ["Memory Usage", f"{memory_bytes / 1024:.2f} KB"],
+        [
+            "Average Record Size",
+            f"{(memory_bytes / num_rows):.2f} Bytes" if num_rows else "0.00 Bytes",
+        ],
+    ]
+
+    return pd.DataFrame(data, columns=["Metric", "Value"])
 
 
-def get_dataset_summary(df: pd.DataFrame) -> str:
-    """Return general dataset statistics as a table."""
-    summary = dataset_summary(df)
-    return f"""
-            | Metric                    | Value        |
-            |---------------------------|--------------|
-            | **Number of Columns**     | {summary['number_of_columns']} |
-            | **Number of Records**     | {summary['number_of_records']} |
-            | **Total Cells**           | {summary['total_cells']} |
-            | **Missing Cells**         | {summary['missing_cells']} |
-            | **Missing Percentage**    | {summary['missing_percentage']}% |
-            | **Duplicate Records**     | {summary['duplicate_records']} |
-            | **Duplicate Percentage**  | {summary['duplicate_percentage']}% |
-            | **Memory Usage**          | {summary['memory_usage_kb']} KB |
-            | **Average Record Size**   | {summary['average_record_size_bytes']} Bytes |
-            """
+def get_markdown_dataset_summary(summary_df: pd.DataFrame) -> str:
+    """Return general dataset statistics as a markdown table string."""
+    lines = [
+        "| Metric                  | Value               |",
+        "|------------------------|----------------------|",
+    ]
+    for _, row in summary_df.iterrows():
+        metric = str(row["Metric"]).strip()
+        value = str(row["Value"]).strip()
+        lines.append(f"| {metric:<23} | {value:<20} |")
+    return "\n".join(lines)
 
 
 def get_column_type_summary(dqp: DQP) -> str:
-    """Return summary of variable types."""
+    """Return summary of variable types as a markdown table (for Streamlit)."""
     column_types = dqp.receive_number_of_columns()
 
     table = "| Column Type | Count |\n"
@@ -54,6 +59,18 @@ def get_column_type_summary(dqp: DQP) -> str:
     for key, value in column_types.items():
         table += f"| {key.replace('_', ' ').title()} | {value} |\n"
     return table
+
+
+def print_column_type_summary_terminal(dqp):
+    """Print summary of variable types using tabulate (for terminal)."""
+    column_types = dqp.receive_number_of_columns()
+
+    df = pd.DataFrame(
+        list(column_types.items()), columns=["Column Type", "Count"]
+    ).sort_values(by="Column Type")
+
+    print(tabulate(df, headers="keys", tablefmt="grid", showindex=False))
+    return df
 
 
 def column_statistics(dqp: DQP, column_name: str) -> dict:
