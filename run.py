@@ -3,7 +3,7 @@ from src.ingestion.loader import load_dataset
 from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
 from src.model.registry import MODEL_REGISTRY
-from helper import quality, fairness
+from pipeline import quality, fairness
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 from tabulate import tabulate
@@ -61,6 +61,26 @@ def main():
     elif target_column not in valid_columns:
         print(f"Invalid target column: {target_column}")
         return
+
+    is_numeric = target_column in numeric_columns
+    if is_numeric:
+        stats.plot_data_distribution_by_column(
+            df,
+            target_column,
+            streamlit_mode=False,
+            is_numeric=is_numeric,
+            save=True,
+            save_path=os.path.join(os.getcwd(), "outputs"),
+        )
+    else:
+        stats.plot_data_distribution_by_column(
+            df,
+            target_column,
+            streamlit_mode=False,
+            is_numeric=is_numeric,
+            save=True,
+            save_path=os.path.join(os.getcwd(), "outputs"),
+        )
 
     # Model Selection
     supported_models = list(MODEL_REGISTRY.keys())

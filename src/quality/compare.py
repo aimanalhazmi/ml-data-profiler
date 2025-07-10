@@ -57,9 +57,9 @@ def compare_outlier_removals(
     return pd.DataFrame(
         [
             {
-                "f1_orig": f1_orig,
-                "f1_statistic": f1_statistic,
-                "f1_influence": f1_influence,
+                "f1_orig": round(f1_orig, 4),
+                "f1_statistic": round(f1_statistic, 4),
+                "f1_influence": round(f1_influence, 4),
             }
         ]
     )

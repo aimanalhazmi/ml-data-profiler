@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import re
 from src.preprocessing.preprocessing import Preprocessor as DQP
 from tabulate import tabulate
+import os
 
 
 def dataset_summary(df: pd.DataFrame) -> pd.DataFrame:
@@ -247,11 +248,12 @@ def plot_data_distribution_by_column(
     plt.tight_layout()
 
     if save and save_path:
+        os.makedirs(save_path, exist_ok=True)
         plt.savefig(f"{save_path}/{column_name}_distribution.png", bbox_inches="tight")
 
     if streamlit_mode and st is not None:
         st.pyplot(plt.gcf())
-    else:
+    elif not streamlit_mode and not save:
         plt.show()
 
     plt.close()

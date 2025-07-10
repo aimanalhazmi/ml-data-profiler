@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
     OneHotEncoder,
@@ -8,11 +10,11 @@ from sklearn.preprocessing import (
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
-from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.impute import KNNImputer
 from scipy.stats.mstats import winsorize
 import pandas as pd
 import numpy as np
-from pandas.api.types import is_numeric_dtype, is_float_dtype
+from pandas.api.types import is_float_dtype
 from src.preprocessing.preprocessing_dict import SENSITIVE_KEYWORDS
 from typing import Tuple, Dict
 
@@ -29,12 +31,13 @@ class Preprocessor:
         self.data = data
         self.target_column = target_column
 
+    @abstractmethod
+    def process_data(self, ohe: OneHotEncoder):
+        pass
+
     def categorize_columns(self) -> Tuple[list, list, list]:
         """
         Categorize DataFrame columns into numeric, text, and categorical based on dtype and uniqueness.
-
-        Args:
-            None
 
         Returns:
             Tuple[List[str], List[str], List[str]]:
@@ -323,7 +326,7 @@ class Preprocessor:
                 (
                     "to_str",
                     FunctionTransformer(
-                        lambda X: X.fillna("").astype(str), validate=False
+                        lambda x: x.fillna("").astype(str), validate=False
                     ),
                 ),
                 ("encode", OneHotEncoder()),
@@ -382,7 +385,7 @@ class Preprocessor:
                 (
                     "to_str",
                     FunctionTransformer(
-                        lambda X: X.fillna("").astype(str), validate=False
+                        lambda x: x.fillna("").astype(str), validate=False
                     ),
                 ),
                 ("passthrough", "passthrough"),
@@ -438,7 +441,7 @@ class Preprocessor:
                 (
                     "clip",
                     FunctionTransformer(
-                        lambda X: np.clip(X, age_min, age_max), validate=False
+                        lambda x: np.clip(x, age_min, age_max), validate=False
                     ),
                 ),
                 (
@@ -450,7 +453,7 @@ class Preprocessor:
                 (
                     "to_label",
                     FunctionTransformer(
-                        lambda X: np.array(age_labels)[X.astype(int).ravel()].reshape(
+                        lambda x: np.array(age_labels)[x.astype(int).ravel()].reshape(
                             -1, 1
                         ),
                         validate=False,
@@ -541,9 +544,6 @@ class Preprocessor:
     def treat_none_values(self) -> None:
         """
         Replace None values with pd.NaN
-
-        Args:
-            None
 
         Returns:
             None
@@ -690,10 +690,10 @@ class FairnessPreprocessor(Preprocessor):
                 (
                     "winsorize",
                     FunctionTransformer(
-                        lambda X: np.vstack(
+                        lambda x: np.vstack(
                             [
-                                winsorize(X[:, j], limits=(0.01, 0.01))
-                                for j in range(X.shape[1])
+                                winsorize(x[:, j], limits=(0.01, 0.01))
+                                for j in range(x.shape[1])
                             ]
                         ).T,
                         validate=False,

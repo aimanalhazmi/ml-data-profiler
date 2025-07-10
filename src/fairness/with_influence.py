@@ -73,9 +73,9 @@ def evaluate_patterns(df, min_support=0.01, top_k=5, max_predicates=1):
             "pattern_val_1": str(vals[0]) if len(vals) > 0 else None,
             "pattern_col_2": keys[1] if len(keys) > 1 else None,
             "pattern_val_2": str(vals[1]) if len(vals) > 1 else None,
-            "support": support,
-            "responsibility": responsibility,
-            "interestingness": interestingness,
+            "support": round(support, 4),
+            "responsibility": round(responsibility, 4),
+            "interestingness": round(interestingness, 4),
         }
         results.append(row)
     results = sorted(results, key=lambda x: -x["interestingness"])

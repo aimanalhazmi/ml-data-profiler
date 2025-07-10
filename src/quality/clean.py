@@ -37,9 +37,9 @@ def summarize_outliers(
         [
             {
                 "Influence_outliers_count": inf_count,
-                "Influence_outliers_%": inf_pct,
+                "Influence_outliers_%": round(inf_pct, 4),
                 "Mahalanobis_outliers_count": mah_count,
-                "Mahalanobis_outliers_%": mah_pct,
+                "Mahalanobis_outliers_%": round(mah_pct, 4),
                 "Overlap_count": overlap,
             }
         ]

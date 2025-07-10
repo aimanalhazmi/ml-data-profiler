@@ -5,8 +5,9 @@ from src.ingestion.loader import load_dataset
 from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
 from src.model.registry import MODEL_REGISTRY
-from src.utils.output import save_results_to_pdf
-from helper import quality, fairness
+from src.utils.output import save_results_to_pdf, print_step_end
+from pipeline import quality, fairness
+import time
 
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
@@ -84,7 +85,9 @@ if "df" in st.session_state:
         if selected_col in valid_columns:
             target = selected_col
         else:
-            st.error(f'"{selected_col}" is not a numerical or categorical column.')
+            st.error(
+                f'"{selected_col}" is not a valid numerical or categorical column.'
+            )
     else:
         # Try from last column backward until a valid one is found
         for col in reversed(df.columns):
@@ -92,7 +95,7 @@ if "df" in st.session_state:
                 target = col
                 break
         if not target:
-            st.error("No numerical or categorical column found in the dataset.")
+            st.error("No valid numerical or categorical column found in the dataset.")
 
     is_numeric = target in numeric_columns
     if target:
@@ -110,13 +113,13 @@ if "df" in st.session_state:
 
 
 @st.cache_data
-def run_quality_analysis(df, model_type, target_column):
-    return quality(df.copy(), model_type, target_column)
+def run_quality_analysis(data, model_type, target_col):
+    return quality(data.copy(), model_type, target_col)
 
 
 @st.cache_data
-def run_fairness_analysis(df, model_type, target_column):
-    return fairness(df.copy(), model_type, target_column)
+def run_fairness_analysis(data, model_type, target_col):
+    return fairness(data.copy(), model_type, target_col)
 
 
 def display_result_section(title, results):
@@ -171,10 +174,16 @@ if "df" in st.session_state and st.session_state.target_column:
     if st.button("Train Model & Run Quality"):
         st.session_state.quality_results = None
         with st.spinner("Running quality pipeline..."):
+            quality_start = time.time()
             st.session_state.quality_results = run_quality_analysis(
-                reduced_df.copy(), st.session_state.model, target_column
+                data=reduced_df.copy(),
+                model_type=st.session_state.model,
+                target_col=target_column,
             )
-        # st.success("✅ Quality pipeline completed.")
+            messages = print_step_end(
+                name="Quality", start_time=quality_start, streamlit_active=True
+            )
+            st.success(messages)
     if st.session_state.quality_results:
         display_result_section("📊 Quality Results", st.session_state.quality_results)
 
@@ -182,10 +191,16 @@ if "df" in st.session_state and st.session_state.target_column:
         if st.button("Run Fairness Analysis"):
             st.session_state.fairness_results = None
             with st.spinner("Running fairness pipeline..."):
+                fairness_start = time.time()
                 st.session_state.fairness_results = run_fairness_analysis(
-                    reduced_df.copy(), st.session_state.model, target_column
+                    data=reduced_df.copy(),
+                    model_type=st.session_state.model,
+                    target_col=target_column,
                 )
-            # st.success("✅ Fairness analysis completed.")
+                messages = print_step_end(
+                    name="Fairness", start_time=fairness_start, streamlit_active=True
+                )
+                st.success(messages)
 
     # Show fairness results
     if st.session_state.fairness_results:
