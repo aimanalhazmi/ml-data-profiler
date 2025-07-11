@@ -105,6 +105,8 @@ class Preprocessor:
                 categorical_columns.append(column)
                 numeric_columns.remove(column)
         """
+
+        categorical_columns = np.unique(categorical_columns).tolist()
         return numeric_columns, text_columns, categorical_columns
 
     def receive_categorized_columns(self) -> Tuple[list, list]:
@@ -384,11 +386,13 @@ class Preprocessor:
             column for column in categorical_columns if column not in sensitive_columns
         ]
 
+        self.data[categorical_columns] = self.data[categorical_columns].fillna("<MISSING>")
+
         transformers = []
         categorical_pipeline = Pipeline(
             [  
-                ("to_str", FunctionTransformer(lambda X: X.fillna("").astype(str), validate=False)),
-                ("impute", SimpleImputer(missing_values="", strategy="constant", fill_value="<MISSING>")),
+                #("impute", SimpleImputer(strategy="constant", fill_value="<MISSING>")),
+                ("to_str", FunctionTransformer(lambda X: X.astype(str), validate=False)),
                 ("encode", OneHotEncoder(dtype=int)),
             ]
         )
@@ -617,6 +621,16 @@ class Preprocessor:
             self.data[column] = self.data[column].replace({"": np.nan, "?": np.nan})
             self.data[column] = self.data[column].replace(r"^\s*$", np.nan, regex=True)
 
+    def ensure_numeric(self, df) -> pd.DataFrame:
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                continue
+            coerced = pd.to_numeric(df[col])
+            df[col] = coerced
+
+        return df
+                
+
 
 class PreprocessorFactory:
     def __init__(self, data, method, target_column: str):
@@ -714,6 +728,8 @@ class DataQualityPreprocessor(Preprocessor):
             ],
             axis=1,
         )
+        if ohe:
+            transformed_data = self.ensure_numeric(transformed_data)
 
         return (
             transformed_data,
@@ -799,6 +815,7 @@ class FairnessPreprocessor(Preprocessor):
             same signature as DataQualityPreprocessor.process_data
         """
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
+
         sensitive_columns = self.find_sensitive_columns(self.data, text_columns)
 
         self.treat_none_values()
@@ -849,6 +866,8 @@ class FairnessPreprocessor(Preprocessor):
             ],
             axis=1,
         )
+        if ohe:
+            transformed_data = self.ensure_numeric(transformed_data)
 
         return (
             transformed_data,
