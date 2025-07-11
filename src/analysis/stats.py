@@ -73,85 +73,126 @@ def get_column_statistics(dqp: DQP, column_name: str) -> str:
     return table
 
 
-def get_alerts(df: pd.DataFrame) -> list[dict]:
-    """Generate basic data quality alerts."""
+import pandas as pd
+
+
+def get_alerts(df: pd.DataFrame, missing_threshold: float = 0.7) -> list[dict]:
+    """Generate data quality alerts for a DataFrame."""
     alerts = []
     for col in df.columns:
         series = df[col]
-        n_unique = series.nunique(dropna=True)
         total = len(series)
         missing = series.isna().sum()
+        n_unique = series.nunique(dropna=True)
         dtype = series.dtype
 
-        # Info alerts
-        if missing == 0:
-            alerts.append(
-                {"level": "info", "message": f'Column "{col}" has no missing values'}
-            )
-        if n_unique == total:
-            alerts.append(
-                {"level": "info", "message": f'Column "{col}" has all unique values'}
-            )
-        if n_unique == 1:
-            alerts.append(
-                {
-                    "level": "info",
-                    "message": f'Column "{col}" has constant value "{series.dropna().iloc[0]}"',
-                }
-            )
-
-        # Warning alerts
-        if 0 < missing < total:
-            alerts.append(
-                {
-                    "level": "warning",
-                    "message": f'Column "{col}" has {missing} missing values ({missing/total*100:.2f}%)',
-                }
-            )
-        if n_unique / total > 0.9 and n_unique < total:
-            alerts.append(
-                {
-                    "level": "warning",
-                    "message": f'Column "{col}" has high cardinality ({n_unique} unique values)',
-                }
-            )
-        if dtype == "object":
-            inferred_types = series.dropna().map(type).nunique()
-            if inferred_types > 1:
-                alerts.append(
-                    {
-                        "level": "warning",
-                        "message": f'Column "{col}" has mixed data types',
-                    }
-                )
-        if (
-            dtype == "object"
-            and series.dropna().apply(lambda x: isinstance(x, str)).all()
-        ):
-            max_len = series.dropna().map(len).max()
-            if max_len > 100:
-                alerts.append(
-                    {
-                        "level": "warning",
-                        "message": f'Column "{col}" contains long strings (up to {max_len} characters)',
-                    }
-                )
+        col_alerts = []
+        error_flag = False
+        warning_flag = False
 
         # Error alerts
         if missing == total:
-            alerts.append(
+            col_alerts.append(
                 {"level": "error", "message": f'Column "{col}" has all values missing'}
             )
+            error_flag = True
+        elif missing / total > missing_threshold:
+            col_alerts.append(
+                {
+                    "level": "error",
+                    "message": f'Column "{col}" has more than {missing_threshold * 100:.0f}% missing values ({missing / total * 100:.2f}%)',
+                }
+            )
+            error_flag = True
         if n_unique == 1 and missing == 0 and total > 1:
-            alerts.append(
+            col_alerts.append(
                 {
                     "level": "error",
                     "message": f'Column "{col}" is entirely constant and may be irrelevant',
                 }
             )
+            error_flag = True
+        if (
+            dtype == "object"
+            and series.dropna().apply(lambda x: isinstance(x, str)).all()
+        ):
+            max_len = series.dropna().map(len).max()
+            if max_len > 275:
+                col_alerts.append(
+                    {
+                        "level": "error",
+                        "message": f'Column "{col}" contains long strings (up to {max_len} characters)',
+                    }
+                )
+                error_flag = True
 
-    order = {"error": 0, "warning": 1, "info": 2}
-    alerts.sort(key=lambda alert: order[alert["level"]])
+        # Warning alerts (only if no error)
+        if not error_flag:
+            if 0 < missing < total:
+                col_alerts.append(
+                    {
+                        "level": "warning",
+                        "message": f'Column "{col}" has {missing} missing values ({missing / total * 100:.2f}%)',
+                    }
+                )
+                warning_flag = True
+            if 0.9 < n_unique / total < 1.0:
+                col_alerts.append(
+                    {
+                        "level": "warning",
+                        "message": f'Column "{col}" has high cardinality ({n_unique} unique values)',
+                    }
+                )
+                warning_flag = True
+            if dtype == "object":
+                inferred_types = series.dropna().map(type).nunique()
+                if inferred_types > 1:
+                    col_alerts.append(
+                        {
+                            "level": "warning",
+                            "message": f'Column "{col}" has mixed data types',
+                        }
+                    )
+                    warning_flag = True
+                elif series.dropna().apply(lambda x: isinstance(x, str)).all():
+                    max_len = series.dropna().map(len).max()
+                    if max_len > 100:
+                        col_alerts.append(
+                            {
+                                "level": "warning",
+                                "message": f'Column "{col}" contains long strings (up to {max_len} characters)',
+                            }
+                        )
+                        warning_flag = True
+
+        # Info alerts (only if no warning or error)
+        if not error_flag and not warning_flag:
+            if missing == 0:
+                col_alerts.append(
+                    {
+                        "level": "info",
+                        "message": f'Column "{col}" has no missing values',
+                    }
+                )
+            if n_unique == total:
+                col_alerts.append(
+                    {
+                        "level": "info",
+                        "message": f'Column "{col}" has all unique values',
+                    }
+                )
+            if n_unique == 1 and missing < total:
+                val = series.dropna().iloc[0] if not series.dropna().empty else "N/A"
+                col_alerts.append(
+                    {
+                        "level": "info",
+                        "message": f'Column "{col}" has constant value "{val}"',
+                    }
+                )
+
+        alerts.extend(col_alerts)
+
+    alerts.sort(key=lambda x: {"error": 0, "warning": 1, "info": 2}[x["level"]])
     return alerts
 
 
