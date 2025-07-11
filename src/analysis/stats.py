@@ -213,7 +213,8 @@ def plot_data_distribution_by_column(
 
     if save and save_path:
         os.makedirs(save_path, exist_ok=True)
-        plt.savefig(f"{save_path}/{column_name}_distribution.png", bbox_inches="tight")
+        safe_name = re.sub(r'[ <>:"/\\|?*]', "_", column_name)
+        plt.savefig(f"{save_path}/{safe_name}_distribution.png", bbox_inches="tight")
 
     if streamlit_mode and st is not None:
         st.pyplot(plt.gcf())
