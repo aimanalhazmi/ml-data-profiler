@@ -10,11 +10,11 @@ from sklearn.preprocessing import (
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
-from sklearn.impute import KNNImputer
+from sklearn.impute import KNNImputer, SimpleImputer
 from scipy.stats.mstats import winsorize
 import pandas as pd
 import numpy as np
-from pandas.api.types import is_float_dtype
+from pandas.api.types import is_float_dtype, is_numeric_dtype
 from src.preprocessing.preprocessing_dict import SENSITIVE_KEYWORDS
 from typing import Tuple, Dict
 
@@ -51,24 +51,39 @@ class Preprocessor:
             if self.data[column].isna().all()
             or self.data[column].dropna().nunique() <= 1
         ]
-
-        for column in drop_columns:
-            print(f"dropping {column}")
-
-        numeric_columns = self.data.select_dtypes([np.number]).columns.tolist()
+        numeric_columns = []
+        text_columns, categorical_columns = [], []
+        for column in self.data.columns:
+            series = self.data[column]
+            if pd.api.types.is_numeric_dtype(series) is False:
+                try:
+                    series = series.astype(float)
+                except (ValueError, TypeError):
+                    pass
+            if pd.api.types.is_numeric_dtype(series):
+                if column not in drop_columns:
+                    unique_values = series.nunique()
+                    if column != self.target_column and unique_values>10:
+                        numeric_columns.append(column)
+                    elif column != self.target_column and unique_values<=10:
+                        categorical_columns.append(column)
+        
+        """
         numeric_columns = [
             column
             for column in numeric_columns
             if column != self.target_column and column not in drop_columns
         ]
-
+        """
         object_columns = self.data.select_dtypes(["object", "string"]).columns.tolist()
         object_columns = [
             column
             for column in object_columns
-            if column != self.target_column and column not in drop_columns
+            if column != self.target_column 
+            and column not in drop_columns 
+            and column not in numeric_columns
         ]
-        text_columns, categorical_columns = [], []
+        
         for column in object_columns:
             unique_value_ratio = self.data[column].nunique() / self.data.shape[0]
             if unique_value_ratio > 0.1:
@@ -76,16 +91,22 @@ class Preprocessor:
             else:
                 categorical_columns.append(column)
 
+        """
+        print(numeric_columns)
         for column in numeric_columns:
             # unique_ratio = self.data[column].nunique() / self.data.shape[0]
             unique_values = self.data[column].nunique()
+            if column == "bar_passed":
+                print(unique_values)
             # if unique_ratio > 0.1:
             if unique_values > 10:
                 pass
             else:
                 categorical_columns.append(column)
                 numeric_columns.remove(column)
+        """
 
+        categorical_columns = np.unique(categorical_columns).tolist()
         return numeric_columns, text_columns, categorical_columns
 
     def receive_categorized_columns(self) -> Tuple[list, list]:
@@ -111,6 +132,17 @@ class Preprocessor:
             ]
         )
 
+        if self.target_column in self.data.columns:
+            if (self.target_column not in numeric_columns
+            and self.target_column not in categorical_columns):
+                series = self.data[self.target_column]
+                unique_values = series.nunique(dropna=True)
+                if is_numeric_dtype(series) and unique_values > 10:
+                    numeric_columns.append(self.target_column)
+                else:
+                    categorical_columns.append(self.target_column)
+
+
         return numeric_columns, categorical_columns
 
     def receive_number_of_columns(self) -> Dict[str, int]:
@@ -133,7 +165,7 @@ class Preprocessor:
 
     def encode_target_column(self) -> pd.DataFrame:
         """
-        Extract the target column as a 1-column DataFrame (passthrough).
+        Extract the target column as a 1-column DataFrame (passthrough). Encoding every target as a binary target.
 
         Returns:
             pd.DataFrame: A single-column DF containing the target.
@@ -149,10 +181,14 @@ class Preprocessor:
                 pass
 
         if pd.api.types.is_numeric_dtype(series) and unique_values > 10:
-            print("Hier")
-            n = series.dropna().shape[0]
-            n_bins = min(10, max(3, int(np.sqrt(n))))
-            cats, bins = pd.qcut(series, q=n_bins, retbins=True, duplicates="drop")
+            arr = series.to_frame().values
+            imputer = KNNImputer(n_neighbors=5, weights="distance", metric="nan_euclidean")
+            imputed = imputer.fit_transform(arr).ravel()
+            series = pd.Series(imputed, index=self.data.index)
+
+            #n = series.shape[0] #series.dropna().shape[0]
+            #n_bins = min(10, max(3, int(np.sqrt(n))))
+            cats, bins = pd.qcut(series, q=2, retbins=True, duplicates="drop")
             if is_float_dtype(series):
                 edges = np.round(bins, 2)
                 labels = [
@@ -193,9 +229,26 @@ class Preprocessor:
 
         target_df = pd.DataFrame(target_preprocessed, columns=[self.target_column], index=self.data.index)
         """
-        cat = self.data[self.target_column].astype("category")
-        codes = cat.cat.codes
-        target_df = pd.DataFrame({self.target_column: codes}, index=self.data.index)
+        # If the target column is categorical
+        df = self.data[[self.target_column]].copy()
+        pipe = Pipeline([
+            ("to_str", FunctionTransformer(
+                lambda X: X.fillna("").astype(str), validate=False
+            )),
+            ("impute", SimpleImputer(
+                strategy="most_frequent",
+                missing_values=""       
+            ))
+        ])
+        df[self.target_column] = pipe.fit_transform(df[[self.target_column]]).ravel()
+
+        series = df[self.target_column]
+        top = series.mode()[0]
+        binary = series.eq(top).astype(int)
+
+        #cat = df[self.target_column].astype("category")
+        #codes = cat.cat.codes
+        target_df = pd.DataFrame({self.target_column: binary}, index=self.data.index)
 
         return target_df
 
@@ -215,10 +268,23 @@ class Preprocessor:
         numeric_columns = [
             column for column in numeric_columns if column not in sensitive_columns
         ]
+
+        for column in numeric_columns:
+            median = np.nanmedian(self.data[column].values.astype(float))
+            self.data[column] = self.data[column].fillna(median)
+        
         transformers = []
 
+        numeric_pipeline = Pipeline([
+            ("imputer", KNNImputer(
+                n_neighbors=5,
+                weights="distance",        
+                metric="nan_euclidean",
+                missing_values=np.nan   
+            ))])
+
         if numeric_columns:
-            transformers.append(("numeric", "passthrough", numeric_columns))
+            transformers.append(("numeric", numeric_pipeline, numeric_columns))
 
         preprocessing = ColumnTransformer(transformers=transformers, remainder="drop")
 
@@ -320,16 +386,14 @@ class Preprocessor:
             column for column in categorical_columns if column not in sensitive_columns
         ]
 
+        self.data[categorical_columns] = self.data[categorical_columns].fillna("<MISSING>")
+
         transformers = []
         categorical_pipeline = Pipeline(
-            [
-                (
-                    "to_str",
-                    FunctionTransformer(
-                        lambda x: x.fillna("").astype(str), validate=False
-                    ),
-                ),
-                ("encode", OneHotEncoder()),
+            [  
+                #("impute", SimpleImputer(strategy="constant", fill_value="<MISSING>")),
+                ("to_str", FunctionTransformer(lambda X: X.astype(str), validate=False)),
+                ("encode", OneHotEncoder(dtype=int)),
             ]
         )
 
@@ -380,21 +444,16 @@ class Preprocessor:
         ]
         transformers = []
 
-        passthrough_pipeline = Pipeline(
+        categorical_pipeline = Pipeline(
             [
-                (
-                    "to_str",
-                    FunctionTransformer(
-                        lambda x: x.fillna("").astype(str), validate=False
-                    ),
-                ),
-                ("passthrough", "passthrough"),
+                ("to_str", FunctionTransformer(lambda X: X.fillna("").astype(str), validate=False)),
+                ("impute", SimpleImputer(missing_values="",strategy="most_frequent")),
             ]
         )
 
         if categorical_columns:
             transformers.append(
-                ("categorical", passthrough_pipeline, categorical_columns)
+                ("categorical", categorical_pipeline, categorical_columns)
             )
 
         preprocessing = ColumnTransformer(transformers=transformers, remainder="drop")
@@ -421,6 +480,12 @@ class Preprocessor:
         Returns:
             pd.DataFrame: DataFrame with encoded sensitive columns.
         """
+        # imputing nan values
+        for column in sensitive_columns:
+            if column in numeric_columns:
+                median = np.nanmedian(self.data[column].values.astype(float))
+                self.data[column] = self.data[column].fillna(median)
+        
         transformers = []
 
         n_bins = 10
@@ -431,13 +496,7 @@ class Preprocessor:
         ]
 
         age_pipeline = Pipeline(
-            [
-                (
-                    "impute",
-                    KNNImputer(
-                        n_neighbors=5, weights="distance", metric="nan_euclidean"
-                    ),
-                ),
+            [   
                 (
                     "clip",
                     FunctionTransformer(
@@ -462,6 +521,14 @@ class Preprocessor:
             ]
         )
 
+        categorical_pipeline = Pipeline(
+            [
+                ("to_str", FunctionTransformer(lambda X: X.fillna("").astype(str), validate=False)),
+                ("impute", SimpleImputer(missing_values="", strategy="most_frequent"))
+            ]
+        )
+
+
         for column in sensitive_columns:
             column_low = column.lower()
             if any(
@@ -469,8 +536,10 @@ class Preprocessor:
                 for age_keyword in SENSITIVE_KEYWORDS.get("age")
             ):
                 transformers.append((f"sensitive_{column}", age_pipeline, [column]))
-            else:
+            elif column in numeric_columns:
                 transformers.append((f"sensitive_{column}", "passthrough", [column]))
+            else:
+                transformers.append((f"sensitive_{column}", categorical_pipeline, [column]))
 
         preprocessing = ColumnTransformer(transformers=transformers, remainder="drop")
 
@@ -552,6 +621,16 @@ class Preprocessor:
             self.data[column] = self.data[column].replace({"": np.nan, "?": np.nan})
             self.data[column] = self.data[column].replace(r"^\s*$", np.nan, regex=True)
 
+    def ensure_numeric(self, df) -> pd.DataFrame:
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                continue
+            coerced = pd.to_numeric(df[col])
+            df[col] = coerced
+
+        return df
+                
+
 
 class PreprocessorFactory:
     def __init__(self, data, method, target_column: str):
@@ -616,6 +695,8 @@ class DataQualityPreprocessor(Preprocessor):
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
         sensitive_columns = []
 
+        self.treat_none_values()
+
         numeric_columns_df = self.encode_numeric_columns(
             numeric_columns, sensitive_columns
         )
@@ -647,6 +728,8 @@ class DataQualityPreprocessor(Preprocessor):
             ],
             axis=1,
         )
+        if ohe:
+            transformed_data = self.ensure_numeric(transformed_data)
 
         return (
             transformed_data,
@@ -678,13 +761,16 @@ class FairnessPreprocessor(Preprocessor):
         numeric_columns = [
             column for column in numeric_columns if column not in sensitive_columns
         ]
+        for column in numeric_columns:
+            median = np.nanmedian(self.data[column].values.astype(float))
+            self.data[column] = self.data[column].fillna(median)
 
         numeric_pipeline = Pipeline(
             [
                 (
                     "impute",
                     KNNImputer(
-                        n_neighbors=5, weights="distance", metric="nan_euclidean"
+                        n_neighbors=5, weights="distance", metric="nan_euclidean", missing_values=np.nan
                     ),
                 ),
                 (
@@ -729,6 +815,7 @@ class FairnessPreprocessor(Preprocessor):
             same signature as DataQualityPreprocessor.process_data
         """
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
+
         sensitive_columns = self.find_sensitive_columns(self.data, text_columns)
 
         self.treat_none_values()
@@ -779,6 +866,8 @@ class FairnessPreprocessor(Preprocessor):
             ],
             axis=1,
         )
+        if ohe:
+            transformed_data = self.ensure_numeric(transformed_data)
 
         return (
             transformed_data,
