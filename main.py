@@ -9,14 +9,16 @@ from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor
 from src.model.registry import MODEL_REGISTRY
 from src.utils.output import *
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from multiprocessing import Process, Queue
+from tqdm import tqdm
 
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 LOG_TO = os.path.join(os.getcwd(), "outputs")
+failed_datasets = []
 
 
-def run_analysis(df, target_column, model_type):
+def run_analysis(df, target_column, model_type, idx=None, url=None):
     overview_summary = stats.dataset_summary(df)
     print(tabulate(overview_summary, headers="keys", tablefmt="grid", showindex=False))
     dqp = Preprocessor(df, target_column="")
@@ -30,6 +32,10 @@ def run_analysis(df, target_column, model_type):
 
     if target_column not in valid_columns:
         print(f"Invalid target column: {target_column}")
+        log_to_file(
+            message=f"Invalid target column or failure in analysis pipeline - Dataset {idx}: {url}",
+            log_to=LOG_TO,
+        )
         return None
 
     stats.plot_data_distribution_by_column(
@@ -42,10 +48,20 @@ def run_analysis(df, target_column, model_type):
     )
 
     (quality_results, quality_output), (fairness_results, fairness_output) = (
-        run_quality_and_fairness(df.copy(), model_type, target_column)
+        run_quality_and_fairness(
+            df=df.copy(),
+            model_type=model_type,
+            target_column=target_column,
+            url=url,
+            idx=idx,
+            timeout=60,
+        )
     )
     print(quality_output)
     print(fairness_output)
+
+    if quality_results is None or fairness_results is None:
+        return None
 
     # quality_results = quality(df.copy(), model_type, target_column)
     # fairness_results = fairness(df.copy(), model_type, target_column)
@@ -76,20 +92,68 @@ def check_target_col(
     return None
 
 
-def run_quality_and_fairness(df, model_type, target_column):
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future_quality = executor.submit(
-            run_and_capture_output, quality, df.copy(), model_type, target_column
+def run_quality_and_fairness(
+    df, model_type, target_column, timeout=None, idx=1, url=None
+):
+    q1 = Queue()
+    q2 = Queue()
+
+    p1 = Process(
+        target=run_with_output, args=(quality, q1, df.copy(), model_type, target_column)
+    )
+    p2 = Process(
+        target=run_with_output,
+        args=(fairness, q2, df.copy(), model_type, target_column),
+    )
+
+    p1.start()
+    p2.start()
+
+    if timeout is not None:
+        start_time = time.time()
+        p1.join(timeout)
+        elapsed = time.time() - start_time
+        remaining = max(0, timeout - elapsed)
+        p2.join(remaining)
+    else:
+        p1.join()
+        p2.join()
+
+    if timeout is not None and p1.is_alive():
+        print(
+            f"Quality process exceeded {timeout // 60} minutes - Dataset {idx}: {url}"
         )
-        future_fairness = executor.submit(
-            run_and_capture_output, fairness, df.copy(), model_type, target_column
+        log_to_file(message=f"TIMEOUT - QUALITY - Dataset {idx}: {url}", log_to=LOG_TO)
+        p1.terminate()
+        q1.put((None, "Quality process timed out."))
+
+    if timeout is not None and p2.is_alive():
+        print(
+            f"Fairness process exceeded {timeout // 60} minutes - Dataset {idx}: {url}"
         )
-        return future_quality.result(), future_fairness.result()
+        log_to_file(message=f"TIMEOUT - FAIRNESS - Dataset {idx}: {url}", log_to=LOG_TO)
+        p2.terminate()
+        q2.put((None, "Fairness process timed out."))
+
+    try:
+        result1 = q1.get(timeout=10)
+    except Exception:
+        msg = "Quality process failed to return results"
+        log_to_file(message=f"{msg}- Dataset {idx}: {url}", log_to=LOG_TO)
+        result1 = (None, f"{msg}.")
+
+    try:
+        result2 = q2.get(timeout=10)
+    except Exception:
+        msg = "Fairness process failed to return results"
+        log_to_file(message=f"{msg}- Dataset {idx}: {url}", log_to=LOG_TO)
+        result2 = (None, f"{msg}.")
+
+    return result1, result2
 
 
 def run_pipeline_auto(datasets_path: str):
     all_results = []
-    failed_datasets = []
 
     if not datasets_path or not os.path.exists(datasets_path):
         print(f"Dataset file '{datasets_path}' not found.")
@@ -102,7 +166,11 @@ def run_pipeline_auto(datasets_path: str):
         print("Dataset file must be a dictionary...")
         return
 
-    for idx, (url, cfg) in enumerate(dataset_configs.items(), 1):
+    for idx, (url, cfg) in tqdm(
+        enumerate(dataset_configs.items(), 1),
+        total=len(dataset_configs),
+        desc="Processing Datasets",
+    ):
         target_column = cfg.get("target_column", "").strip()
         file_number = cfg.get("no_dataset", 1)
 
@@ -130,26 +198,16 @@ def run_pipeline_auto(datasets_path: str):
             model_type = MODEL_REGISTRY[selected_model]
             print(f"Model selected: {selected_model} | Target column: {target_column}")
 
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(run_analysis, df, target_column, model_type)
-                result = future.result(timeout=3600)
+            result = run_analysis(df, target_column, model_type, idx, url)
 
             if result:
                 all_results.append((idx, url, result))
             else:
-                log_to_file(
-                    message=f"Invalid target column or failure in analysis pipeline - Dataset {idx}: {url}",
-                    log_to=LOG_TO,
-                )
                 failed_datasets.append((idx, url))
 
-        except FuturesTimeoutError:
-            print(f"Timeout: Dataset {idx} exceeded 60 minutes.")
-            log_to_file(message="TIMEOUT - Dataset {idx}: {url}", log_to=LOG_TO)
-            failed_datasets.append((idx, url))
         except Exception as e:
             print(f"Error: {e}. Skipping dataset {idx}.")
-            log_to_file(message="ERROR - Dataset {idx}: {url} | {e}", log_to=LOG_TO)
+            log_to_file(message=f"ERROR - Dataset {idx}: {url} | {e}", log_to=LOG_TO)
             failed_datasets.append((idx, url))
 
     if all_results:
@@ -239,10 +297,16 @@ def manual():
     start_time = time.time()
     print("\nRunning analysis...")
     (quality_results, quality_output), (fairness_results, fairness_output) = (
-        run_quality_and_fairness(df.copy(), model_type, target_column)
+        run_quality_and_fairness(
+            df=df.copy(), model_type=model_type, target_column=target_column, url=url
+        )
     )
     print(quality_output)
     print(fairness_output)
+
+    if quality_results is None or fairness_results is None:
+        print("\nNo results found.")
+        return None
 
     print("\nAnalysis complete.")
 

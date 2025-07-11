@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from datetime import datetime
 import os
+import sys
 import io
 from contextlib import redirect_stdout
 
@@ -46,6 +47,22 @@ def run_and_capture_output(func, *args, **kwargs):
         result = func(*args, **kwargs)
     output = buf.getvalue()
     return result, output
+
+
+def run_with_output(func, queue, *args):
+    buffer = io.StringIO()
+    sys_stdout = sys.stdout
+    sys.stdout = buffer
+
+    try:
+        result = func(*args)
+        output = buffer.getvalue()
+        queue.put((result, output))
+    except Exception as e:
+        queue.put((None, f"Error: {e}"))
+    finally:
+        sys.stdout = sys_stdout
+        buffer.close()
 
 
 def format_bool_label(val: bool, streamlit_active: bool = False) -> str | bool:
