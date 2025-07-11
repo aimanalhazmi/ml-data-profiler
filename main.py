@@ -18,7 +18,7 @@ LOG_TO = os.path.join(os.getcwd(), "outputs")
 failed_datasets = []
 
 
-def run_analysis(df, target_column, model_type, idx=None, url=None):
+def run_analysis(df, target_column, model_type, idx=None, url=None, timeout=3600):
     overview_summary = stats.dataset_summary(df)
     print(tabulate(overview_summary, headers="keys", tablefmt="grid", showindex=False))
     dqp = Preprocessor(df, target_column="")
@@ -54,7 +54,7 @@ def run_analysis(df, target_column, model_type, idx=None, url=None):
             target_column=target_column,
             url=url,
             idx=idx,
-            timeout=60,
+            timeout=timeout,
         )
     )
     print(quality_output)
@@ -196,9 +196,12 @@ def run_pipeline_auto(datasets_path: str):
         try:
             df = load_dataset(url, file_number)
             model_type = MODEL_REGISTRY[selected_model]
-            print(f"Model selected: {selected_model} | Target column: {target_column}")
+            timeout = cfg.get("timeout", 3600)
+            print(
+                f"\nModel selected: {selected_model} | Target column: {target_column}"
+            )
 
-            result = run_analysis(df, target_column, model_type, idx, url)
+            result = run_analysis(df, target_column, model_type, idx, url, timeout)
 
             if result:
                 all_results.append((idx, url, result))
