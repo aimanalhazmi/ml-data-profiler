@@ -5,7 +5,7 @@ from src.ingestion.loader import load_dataset
 from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
 from src.model.registry import MODEL_REGISTRY
-from src.utils.output import save_results_to_pdf, print_step_end
+from src.utils.output import *
 from pipeline import quality, fairness
 import time
 
@@ -44,7 +44,8 @@ if "df" in st.session_state:
         with col1:
             st.subheader("Dataset Summary")
             summary = stats.dataset_summary(df)
-            st.markdown(stats.get_markdown_dataset_summary(summary))
+            st.session_state.summary = summary
+            st.markdown(markdown_dataset_summary(summary))
 
         with col2:
             st.subheader("Column Analysis")
@@ -54,12 +55,17 @@ if "df" in st.session_state:
 
         with col3:
             st.subheader("Column Types")
-            column_types_summary = stats.get_column_type_summary(dqp=dqp)
+            column_types = dqp.receive_number_of_columns()
+            column_types_summary = make_table_column_type_summary(
+                column_types=column_types
+            )
+            st.session_state.column_types = column_types
             st.markdown(column_types_summary)
 
     with tab2:
         st.subheader("Alerts")
         alerts = stats.get_alerts(df)
+        st.session_state.alerts = alerts
         if alerts:
             for alert in alerts:
                 if alert["level"] == "info":
@@ -147,7 +153,7 @@ if "df" in st.session_state and st.session_state.target_column:
         st.session_state.model = MODEL_REGISTRY[selected_model]
     else:
         st.info(
-            f"No model selected. Using default: Logistic Regression | Target column: '{target_column}'"
+            f"No model selected. Using default: Logistic Regression | Target column: {target_column}"
         )
         st.session_state.model = MODEL_REGISTRY[supported_models[0]]
 
@@ -213,8 +219,12 @@ if "quality_results" in st.session_state and "fairness_results" in st.session_st
         with st.spinner("Generating report..."):
             report_path = "outputs/final_report.pdf"
             os.makedirs(os.path.dirname(report_path), exist_ok=True)
+            column_types = print_column_type_summary(st.session_state.column_types)
             save_results_to_pdf(
                 filepath=report_path,
+                overview_summary=st.session_state.summary,
+                column_types=column_types,
+                alerts=st.session_state.alerts,
                 quality_results=st.session_state.quality_results,
                 fairness_results=st.session_state.fairness_results,
             )

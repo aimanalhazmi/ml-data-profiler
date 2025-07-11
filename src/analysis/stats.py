@@ -38,42 +38,6 @@ def dataset_summary(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(data, columns=["Metric", "Value"])
 
 
-def get_markdown_dataset_summary(summary_df: pd.DataFrame) -> str:
-    """Return general dataset statistics as a markdown table string."""
-    lines = [
-        "| Metric                  | Value               |",
-        "|------------------------|----------------------|",
-    ]
-    for _, row in summary_df.iterrows():
-        metric = str(row["Metric"]).strip()
-        value = str(row["Value"]).strip()
-        lines.append(f"| {metric:<23} | {value:<20} |")
-    return "\n".join(lines)
-
-
-def get_column_type_summary(dqp: DQP) -> str:
-    """Return summary of variable types as a markdown table (for Streamlit)."""
-    column_types = dqp.receive_number_of_columns()
-
-    table = "| Column Type | Count |\n"
-    table += "|-------------|--------|\n"
-    for key, value in column_types.items():
-        table += f"| {key.replace('_', ' ').title()} | {value} |\n"
-    return table
-
-
-def print_column_type_summary_terminal(dqp):
-    """Print summary of variable types using tabulate (for terminal)."""
-    column_types = dqp.receive_number_of_columns()
-
-    df = pd.DataFrame(
-        list(column_types.items()), columns=["Column Type", "Count"]
-    ).sort_values(by="Column Type")
-
-    print(tabulate(df, headers="keys", tablefmt="grid", showindex=False))
-    return df
-
-
 def column_statistics(dqp: DQP, column_name: str) -> dict:
     """Return column specific statistics."""
     df = dqp.data

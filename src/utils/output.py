@@ -7,6 +7,10 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
+from datetime import datetime
+import os
+import io
+from contextlib import redirect_stdout
 
 BLUE = "\033[34m"
 YELLOW = "\033[33m"
@@ -15,23 +19,47 @@ RESET = "\033[0m"
 
 
 def print_step_start(name):
+    """Prints the start of a named analysis step."""
     print(f"\n=== Running {name} Analysis ===")
 
 
 def print_info(streamlit_active, msg):
+    """Prints info message and shows Streamlit success if active."""
     if streamlit_active:
         st.success(msg)
     print(msg)
 
 
-def color_bool(val, streamlit_active=False):
+def log_to_file(message: str, log_to: str = ""):
+    timestamp = datetime.now()
+    filename_time = timestamp.strftime("%m-%d_%H")
+    log_path = os.path.join(log_to, f"{filename_time}_log.txt")
+
+    entry_time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    with open(log_path, "a") as f:
+        f.write(f"[{entry_time}] {message}\n")
+
+
+def run_and_capture_output(func, *args, **kwargs):
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        result = func(*args, **kwargs)
+    output = buf.getvalue()
+    return result, output
+
+
+def format_bool_label(val: bool, streamlit_active: bool = False) -> str | bool:
+    """
+    Returns 'Yes' or 'No' for display in PDF/terminal,
+    or the raw boolean value if used in Streamlit.
+    """
     if streamlit_active:
         return val
-    else:
-        return f"\033[92m{val}\033[0m" if val else f"\033[91m{val}\033[0m"
+    return "Yes" if val else "No"
 
 
 def is_streamlit_active():
+    """Checks if Streamlit is running."""
     try:
         return st.runtime.exists()
     except (ImportError, AttributeError):
@@ -39,6 +67,7 @@ def is_streamlit_active():
 
 
 def print_step_end(name, start_time, streamlit_active):
+    """Prints or returns elapsed time for a named step."""
     elapsed = time.time() - start_time
     minutes = elapsed / 60
     message = f"\n{name} completed in {elapsed:.2f} seconds ({minutes:.2f} minutes)."
@@ -50,6 +79,7 @@ def print_step_end(name, start_time, streamlit_active):
 
 
 def display_alerts(alerts: list[dict]):
+    """Prints alert messages with colored level tags."""
     if not alerts:
         print(f"{BLUE}[INFO]{RESET} No alerts found.")
         return
@@ -61,12 +91,51 @@ def display_alerts(alerts: list[dict]):
         if level == "error":
             print(f"{RED}[ERROR]{RESET}: {msg}")
         elif level == "warning":
-            print(f"{YELLOW}: [WARNING]{RESET}:  {msg}")
+            print(f"{YELLOW}[WARNING]{RESET}:  {msg}")
         else:
             print(f"{BLUE}[INFO]{RESET}: {msg}")
 
 
+def markdown_dataset_summary(summary_df: pd.DataFrame) -> str:
+    """Return general dataset statistics as a markdown table string."""
+    lines = [
+        "| Metric                  | Value               |",
+        "|------------------------|----------------------|",
+    ]
+    for _, row in summary_df.iterrows():
+        metric = str(row["Metric"]).strip()
+        value = str(row["Value"]).strip()
+        lines.append(f"| {metric:<23} | {value:<20} |")
+    return "\n".join(lines)
+
+
+def make_table_column_type_summary(column_types: dict) -> str:
+    """Returns column type summary as markdown table string."""
+    table = "| Column Type | Count |\n"
+    table += "|-------------|--------|\n"
+    for key, value in column_types.items():
+        table += f"| {key.replace('_', ' ').title()} | {value} |\n"
+    return table
+
+
+def print_column_type_summary(column_types: dict) -> pd.DataFrame:
+    """Prints column type summary as a tabulated table (terminal)."""
+    mapper = {
+        "numeric_columns": "Numeric Columns",
+        "categorical_columns": "Categorical Columns",
+        "text_columns": "Text Columns",
+    }
+
+    df = pd.DataFrame(list(column_types.items()), columns=["Column Type", "Count"])
+    df["Column Type"] = df["Column Type"].map(mapper).fillna(df["Column Type"])
+    df = df.sort_values(by="Column Type")
+
+    print(tabulate(df, headers="keys", tablefmt="grid", showindex=False))
+    return df
+
+
 def display_f1_report(report_df):
+    """Displays F1 score report in tabular format."""
     column_map = {
         "f1_orig": "F1 Score (Original)",
         "f1_statistic": "F1 Score (Statistic)",
@@ -80,6 +149,7 @@ def display_f1_report(report_df):
 
 
 def display_outlier_summary(summary_df):
+    """Displays outlier detection summary in tabular format."""
     column_map = {
         "Influence_outliers_count": "Influence Outliers (Count)",
         "Influence_outliers_%": "Influence Outliers (%)",
@@ -95,6 +165,7 @@ def display_outlier_summary(summary_df):
 
 
 def display_top_patterns(top_patterns):
+    """Displays top discovered patterns in a tabular format."""
     top_patterns_column_map = {
         "pattern_col_1": "Pattern Column 1",
         "pattern_val_1": "Pattern Value 1",
@@ -106,6 +177,13 @@ def display_top_patterns(top_patterns):
     }
 
     top_patterns_display = top_patterns.rename(columns=top_patterns_column_map)
+    if (
+        top_patterns["pattern_col_2"].isnull().all()
+        and top_patterns["pattern_val_2"].isnull().all()
+    ):
+        top_patterns_display = top_patterns_display.drop(
+            columns=["Pattern Column 2", "Pattern Value 2"]
+        )
 
     print("\n=== Top Patterns ===")
     print(
@@ -120,6 +198,7 @@ def display_top_patterns(top_patterns):
 
 
 def print_influence_top_patterns(influence_top_patterns: list[dict], streamlit_active):
+    """Prints influence-based fairness patterns and returns as DataFrame."""
     print("\n=== Fairness (With Influence) ===")
     influence_summary = []
     for pattern in influence_top_patterns:
@@ -130,7 +209,7 @@ def print_influence_top_patterns(influence_top_patterns: list[dict], streamlit_a
                 "Mean (Positive)": round(float(pattern["mean_pos"]), 8),
                 "Mean (Other)": round(float(pattern["mean_other"]), 8),
                 "Mean Difference": round(float(pattern["Inf_mean_diff"]), 8),
-                "Influence Fair": color_bool(
+                "Influence Fair": format_bool_label(
                     bool(pattern["Inf_fair"]), streamlit_active
                 ),
             }
@@ -140,6 +219,7 @@ def print_influence_top_patterns(influence_top_patterns: list[dict], streamlit_a
 
 
 def print_one_influence_top_patterns(influence_top_patterns: dict, streamlit_active):
+    """Prints a single influence-based fairness pattern."""
     influence_summary = [
         {
             "Influence Group": influence_top_patterns["group_col"],
@@ -147,7 +227,7 @@ def print_one_influence_top_patterns(influence_top_patterns: dict, streamlit_act
             "Mean (Positive)": f"{float(influence_top_patterns['mean_pos']):.8f}",
             "Mean (Other)": f"{float(influence_top_patterns['mean_other']):.8f}",
             "Mean Difference": f"{float(influence_top_patterns['Inf_mean_diff']):.8f}",
-            "Influence Fair": color_bool(
+            "Influence Fair": format_bool_label(
                 bool(influence_top_patterns["Inf_fair"]), streamlit_active
             ),
         }
@@ -162,6 +242,7 @@ def print_one_influence_top_patterns(influence_top_patterns: dict, streamlit_act
 def print_no_influence_top_patterns(
     no_influence_top_patterns: list[dict], streamlit_active
 ):
+    """Prints fairness metrics without influence."""
     print("\n=== Fairness (No Influence) ===")
     no_influence_summary = []
     for pattern in no_influence_top_patterns:
@@ -169,11 +250,17 @@ def print_no_influence_top_patterns(
             {
                 "Sensitive Feature": pattern["sensitive_feature"],
                 "DPD": round(float(pattern["DPD"]), 4),
-                "DPD Fair": color_bool(bool(pattern["DPD_fair"]), streamlit_active),
+                "DPD Fair": format_bool_label(
+                    bool(pattern["DPD_fair"]), streamlit_active
+                ),
                 "EOD": round(float(pattern["EOD"]), 4),
-                "EOD Fair": color_bool(bool(pattern["EOD_fair"]), streamlit_active),
+                "EOD Fair": format_bool_label(
+                    bool(pattern["EOD_fair"]), streamlit_active
+                ),
                 "PPV Diff": round(float(pattern["PPV_diff"]), 4),
-                "PPV Fair": color_bool(bool(pattern["PPV_fair"]), streamlit_active),
+                "PPV Fair": format_bool_label(
+                    bool(pattern["PPV_fair"]), streamlit_active
+                ),
             }
         )
     print(tabulate(no_influence_summary, headers="keys", tablefmt="grid"))
@@ -181,7 +268,7 @@ def print_no_influence_top_patterns(
 
 
 def print_pattern_table(df_patterns):
-    print("\n=== Top Patterns (Condensed View) ===")
+    """Prints a condensed table of top patterns (manual formatting)."""
     header = f"{'Pattern':<65} | {'Support':>8} | {'Respons.':>10} | {'Interest.':>11}"
     print(header)
     print("-" * len(header))
@@ -201,6 +288,7 @@ def print_pattern_table(df_patterns):
 
 
 def pattern_to_readable(pattern, columns):
+    """Converts a pattern dict to a list of readable condition strings."""
     readable = []
     for col_idx, val in pattern.items():
         col_name = columns[col_idx] if isinstance(col_idx, int) else col_idx
@@ -211,71 +299,146 @@ def pattern_to_readable(pattern, columns):
     return readable
 
 
-def add_section(title, results, elements, styles):
-    elements.append(Spacer(1, 12))
+def create_section_header(title, styles, align="left"):
+    """Creates a formatted paragraph title for a section header."""
+    alignment = {"left": 0, "center": 1}.get(align, 0)
+    style = ParagraphStyle(name=title, parent=styles["Heading2"], alignment=alignment)
+    return Paragraph(f"<b>{title}</b>", style)
 
-    # Section title: LEFT-aligned
-    section_style = ParagraphStyle(
-        name="section-title", parent=styles["Heading2"], alignment=0  # 0 = left
+
+def create_table(data, styles, col_widths, h_align="CENTER"):
+    """Builds a styled ReportLab table from data and column widths."""
+    table = Table(data, colWidths=col_widths, hAlign=h_align)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
     )
-    elements.append(Paragraph(f"<b>{title}</b>", section_style))
+    return table
 
-    page_width = A4[0]
-    max_table_width = page_width - 2 * cm
 
-    wrap_style = ParagraphStyle(
-        "wrap",
+def add_section(
+    title, results, elements, styles, max_table_width, align="center", is_alerts=False
+):
+    """Adds a content section to the PDF report, optionally styling alerts."""
+    elements.append(Spacer(1, 12))
+    elements.append(create_section_header(title, styles, align=align))
+
+    if is_alerts and not results:
+        elements.append(Paragraph("No alerts found.", styles["Normal"]))
+        return
+
+    subsection_style = ParagraphStyle(
+        name="subsection-title", parent=styles["Heading4"], alignment=1
+    )
+    wrap_center = ParagraphStyle(
+        "wrap-center",
         parent=styles["Normal"],
+        alignment=1,
+        fontSize=10,
+        leading=11,
+        wordWrap="CJK",
+    )
+    wrap_left = ParagraphStyle(
+        "wrap-left",
+        parent=styles["Normal"],
+        alignment=0,
         fontSize=10,
         leading=11,
         wordWrap="CJK",
     )
 
-    # Subsection title style: LEFT-aligned
-    subsection_style = ParagraphStyle(
-        name="subsection-title", parent=styles["Heading4"], alignment=1
-    )
-
-    for section_title, df in results:
+    for section_title, content in results:
         elements.append(Spacer(1, 6))
-        elements.append(Paragraph(section_title, subsection_style))
+        if section_title:
+            elements.append(Paragraph(section_title, subsection_style))
 
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            data = [df.columns.tolist()] + df.astype(str).values.tolist()
-            data = [[Paragraph(cell, wrap_style) for cell in row] for row in data]
-
-            num_cols = len(data[0])
-            base_col_width = max_table_width / num_cols
-            col_widths = [base_col_width] * num_cols
-
-            table = Table(data, colWidths=col_widths, hAlign="CENTER")
-            table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                        ("TOPPADDING", (0, 0), (-1, -1), 2),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-                    ]
+        if is_alerts:
+            data = [
+                [
+                    Paragraph("<b>Level</b>", wrap_center),
+                    Paragraph("<b>Message</b>", wrap_center),
+                ]
+            ]
+            for alert in content:
+                level = alert.get("level", "").capitalize()
+                message = alert.get("message", "")
+                color = {"error": "red", "warning": "orange", "info": "blue"}.get(
+                    level.lower(), "black"
                 )
-            )
-            elements.append(table)
+                level_para = Paragraph(
+                    f'<font color="{color}">{level}</font>', wrap_center
+                )
+                message_para = Paragraph(
+                    f'<font color="{color}">{message}</font>', wrap_center
+                )
+                data.append([level_para, message_para])
+
+        elif isinstance(content, pd.DataFrame) and not content.empty:
+            data = [content.columns.tolist()] + content.astype(str).values.tolist()
+            data = [[Paragraph(cell, wrap_left) for cell in row] for row in data]
         else:
             elements.append(Paragraph("No data.", styles["Normal"]))
+            continue
 
+        col_count = len(data[0])
+        col_widths = [max_table_width / col_count] * col_count
+        elements.append(create_table(data, styles, col_widths))
         elements.append(Spacer(1, 6))
 
 
-def save_results_to_pdf(filepath, quality_results, fairness_results):
+def save_results_to_pdf(
+    filepath, overview_summary, column_types, alerts, quality_results, fairness_results
+):
+    """Generates and saves the final PDF report with all analysis results."""
     doc = SimpleDocTemplate(filepath, pagesize=A4)
     elements = []
     styles = getSampleStyleSheet()
+    page_width = A4[0]
 
-    add_section("1. Quality Results", quality_results, elements, styles)
-    add_section("2. Fairness Results", fairness_results, elements, styles)
+    main_title = Paragraph(
+        "<b>Fairfluence Report</b>",
+        ParagraphStyle(
+            name="MainTitle",
+            parent=styles["Heading1"],
+            alignment=1,
+            fontSize=18,
+            spaceAfter=8,
+        ),
+    )
+    elements.append(main_title)
+
+    add_section(
+        "Dataset Summary",
+        [("", overview_summary)],
+        elements,
+        styles,
+        page_width - 6 * cm,
+    )
+    add_section(
+        "Column Type Summary",
+        [("", column_types)],
+        elements,
+        styles,
+        page_width - 6 * cm,
+    )
+    add_section(
+        "Alerts", [("", alerts)], elements, styles, page_width - 2 * cm, is_alerts=True
+    )
+    add_section(
+        "Quality Results", quality_results, elements, styles, page_width - 2 * cm
+    )
+    add_section(
+        "Fairness Results", fairness_results, elements, styles, page_width - 2 * cm
+    )
 
     doc.build(elements)
