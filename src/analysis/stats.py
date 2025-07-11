@@ -73,9 +73,6 @@ def get_column_statistics(dqp: DQP, column_name: str) -> str:
     return table
 
 
-import pandas as pd
-
-
 def get_alerts(df: pd.DataFrame, missing_threshold: float = 0.7) -> list[dict]:
     """Generate data quality alerts for a DataFrame."""
     alerts = []
