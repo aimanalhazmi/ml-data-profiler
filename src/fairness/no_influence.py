@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import re
 from sklearn.metrics import precision_score
+from scipy import stats
 from fairlearn.metrics import (
     demographic_parity_difference,
     equalized_odds_difference,
@@ -13,51 +14,71 @@ import os, sys
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, SRC)
 
-from src.influence.logistic_influence import LogisticInfluence
-
-
 # group_train, is the training part of the column we want to compare. (e.g. "education")
 # possitive_group is the group inside the column that we want to analyse. (e.g. "HS-grad")
-def compute_influence_group_diff(
-    X_train,
-    X_test,
-    y_train,
-    y_test,
-    model,
-    class_train,
-    positive_group,
-    random_state=912,
-    frac=0.001,
-    influence_tol=0.001,
-):
-    if frac < 1.0:
-        X_te = X_test.sample(frac=frac, random_state=random_state)
-        y_te = y_test.loc[X_te.index]
+def compute_fairness_influence_metrics(df, class_col, positive_group, d_tol=0.2):
+    """
+    Compute group-level influence fairness metrics using Cohen's d effect size,
+    supporting both discrete labels and interval-based groups.
+
+    Parameters:
+    - df: pandas.DataFrame containing 'influence' and the class_col.
+    - class_col: name of the column in df holding the group labels or intervals.
+    - positive_group: subgroup value to evaluate; may be a label, a pd.Interval,
+                      or an interval string like "(low, high]".
+    - d_tol: Cohen's d threshold below which groups are considered fair.
+
+    Returns:
+    - dict with:
+        'group_col', 'positive_group', 'mean_positive_group', 'mean_other',
+        'Inf_mean_diff', 'cohen_d', 'Inf_fair', 'Cohen_fair'
+    """
+    influences = df['influence']
+    groups = df[class_col]
+
+    if isinstance(positive_group, pd.Interval):
+        mask_pos = groups == positive_group
+
+    elif isinstance(positive_group, str):
+        m = re.match(r'([\[\(])\s*([-+]?[0-9]*\.?[0-9]+)\s*,\s*([-+]?[0-9]*\.?[0-9]+)\s*([\]\)])', 
+                     positive_group)
+        if m:
+            lb, lo, hi, rb = m.groups()
+            lo, hi = float(lo), float(hi)
+            lower_ok = (groups >= lo) if lb == '[' else (groups > lo)
+            upper_ok = (groups <= hi) if rb == ']' else (groups < hi)
+            mask_pos = lower_ok & upper_ok
+        else:
+            mask_pos = groups.astype(str) == positive_group
+
     else:
-        X_te, y_te = X_test, y_test
+        mask_pos = groups == positive_group
 
-    infl = LogisticInfluence(
-        model, X_train.values.astype(float), y_train.values.astype(float)
-    )
-    avg_inf = infl.average_influence(
-        X_te.values.astype(float), y_te.values.astype(float)
-    )
+    pos_vals   = influences[mask_pos]
+    other_vals = influences[~mask_pos]
 
-    grp = class_train.loc[X_train.index]
+    n1, n2 = len(pos_vals), len(other_vals)
+    mean1, mean2 = pos_vals.mean(), other_vals.mean()
+    std1, std2 = pos_vals.std(ddof=1), other_vals.std(ddof=1)
+    delta = mean1 - mean2
 
-    mean_pos = avg_inf[grp == positive_group].mean()
-    mean_other = avg_inf[grp != positive_group].mean()
-    diff = abs(mean_pos - mean_other)
-    fair = diff <= influence_tol
+    pooled_std = np.sqrt(((n1-1)*std1**2 + (n2-1)*std2**2) / max(n1+n2-2, 1))
+    cohens_d = delta / pooled_std if pooled_std > 0 else 0.0
+
+    inf_fair   = abs(delta / mean2) <= 3
+    cohen_fair = abs(cohens_d) <= d_tol
 
     return {
-        "group_col": class_train.name,
-        "positive_group": positive_group,
-        "mean_pos": mean_pos,
-        "mean_other": mean_other,
-        "Inf_mean_diff": diff,
-        "Inf_fair": fair,
+        'group_col': class_col,
+        'positive_group': positive_group,
+        'mean_positive_group': mean1,
+        'mean_other': mean2,
+        'Inf_mean_diff': delta,
+        'cohen_d': cohens_d,
+        'Inf_fair': inf_fair,
+        'Cohen_fair': cohen_fair
     }
+
 
 
 # Influence threshold is a parameter because we have to find out which number should be the threshold.
@@ -65,44 +86,23 @@ def compute_influence_group_diff(
 # Computes PPV for each group (and flags whether each group is within tolerance).
 # Computes the global mean‐influence for positive vs. negative classes and flags it too.
 # The model parameter must be trained!
-def compute_fairness_metrics(
-    X_train,
+def compute_fairness_classical_metrics(
     X_test,
-    y_train,
     y_test,
     s_test_df,
     sens_cols,
     model,
-    group_train_df,
-    positive_group,
-    random_state=42,
-    frac=0.001,
     dpd_tol=0.1,
     eod_tol=0.1,
     ppv_tol=0.1,
-    influence_tol=0.001,
 ):
-    # first compute your influence‐group statistics
-    infl_group = compute_influence_group_diff(
-        X_train,
-        X_test,
-        y_train,
-        y_test,
-        model,
-        group_train_df,
-        positive_group,
-        random_state,
-        frac,
-        influence_tol,
-    )
 
-    y_pred = model.predict(X_test.values)
+    y_pred = model.predict(X_test)
 
     # Get DPD and EOD per sensitive column. Then get PPV for each category inside the columns.
     records = []
     for sens in sens_cols:
         sf_test = s_test_df[sens].astype(str)
-        # sf_test = s_test_df[sens]
         dpd = demographic_parity_difference(
             y_true=y_test, y_pred=y_pred, sensitive_features=sf_test
         )
@@ -137,4 +137,4 @@ def compute_fairness_metrics(
             }
         )
 
-    return records, infl_group
+    return records
