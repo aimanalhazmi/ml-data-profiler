@@ -26,8 +26,8 @@ fairfluence/
 ├── notebooks/                      # Exploratory notebooks for analysis & prototyping
 ├── src/
 │   ├── ingestion/                  # Dataset loaders (OpenML, Kaggle, HF)
-│   │   ├── ingestorFactory.py      # 
-│   │   ├── laoder.py               #
+│   │   ├── ingestorFactory.py      # Automatically recognises source of data, loads it and returns raw data
+│   │   ├── laoder.py               # Initializes ingestorFactory
 │   ├── preprocessing/             
 │   │   ├── preprocessing.py        # complete preprocessing logic for data quality and fairness analysis
 │   ├── analysis/                   # Comparison, statistics & visualization
