@@ -3,7 +3,7 @@ from sklearn.model_selection import train_test_split
 from src.model.train import train_model
 from src.quality.compare import compare_outlier_removals
 from src.quality.clean import summarize_outliers
-from src.fairness.no_influence import compute_fairness_metrics
+from src.fairness.no_influence import compute_fairness_classical_metrics, compute_fairness_influence_metrics
 from src.fairness.with_influence import evaluate_patterns
 from src.influence.logistic_influence import LinearSVMInfluence, LogisticInfluence
 from src.utils.output import *
@@ -127,11 +127,10 @@ def quality(df, model_type, target_column):
 def fairness(df, model_type, target_column):
     test_size = 0.2
     random_state = 42
-    frac = 0.05
     dpd_tol = 0.1
     eod_tol = 0.1
     ppv_tol = 0.1
-    influence_tol = 0.05
+    d_tol=0.2
 
     streamlit_active = is_streamlit_active()
     print_step_start(name="Fairness")
@@ -182,39 +181,23 @@ def fairness(df, model_type, target_column):
 
     model = train_model(X_train.values, y_train.values, model_type)
 
+    no_influence = compute_fairness_classical_metrics(X_test, y_test, s_test_df, df[sensitive_columns_fairness], model, dpd_tol=dpd_tol, eod_tol=eod_tol, ppv_tol=ppv_tol)
+    no_influence_top_patterns.append(no_influence)
+
     for i in range(len(top_patterns)):
         influence_group_col = top_patterns.at[i, "pattern_col_1"]
         positive_group = top_patterns.at[i, "pattern_val_1"]
         print(
             f"\nPattern [{i+1}]: Influence Group Column: {influence_group_col}, Positive Group: {positive_group}"
         )
-        _, _, _, _, group_train_df, _ = train_test_split(
-            X.copy(),
-            y.copy(),
-            df[influence_group_col],
-            test_size=test_size,
-            stratify=y,
-            random_state=random_state,
-        )
-        no_influence, influence = compute_fairness_metrics(
-            X_train=X_train,
-            X_test=X_test,
-            y_train=y_train,
-            y_test=y_test,
-            s_test_df=s_test_df,
-            sens_cols=sensitive_columns_fairness,
-            model=model,
-            group_train_df=group_train_df,
+
+        influence = compute_fairness_influence_metrics(
+            X_train_raw,
+            class_col=influence_group_col,
             positive_group=positive_group,
-            random_state=random_state,
-            frac=frac,
-            dpd_tol=dpd_tol,
-            eod_tol=eod_tol,
-            ppv_tol=ppv_tol,
-            influence_tol=influence_tol,
+            d_tol=d_tol,
         )
 
-        no_influence_top_patterns.append(no_influence)
         influence_top_patterns.append(influence)
 
     no_influence_summary = print_no_influence_top_patterns(
