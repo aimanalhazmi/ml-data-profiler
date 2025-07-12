@@ -221,13 +221,16 @@ def print_influence_top_patterns(influence_top_patterns: list[dict], streamlit_a
     for pattern in influence_top_patterns:
         influence_summary.append(
             {
-                "Influence Group": pattern["group_col"],
+               "Influence Group": pattern["group_col"],
                 "Positive Group": pattern["positive_group"],
-                "Mean (Positive)": round(float(pattern["mean_pos"]), 8),
-                "Mean (Other)": round(float(pattern["mean_other"]), 8),
-                "Mean Difference": round(float(pattern["Inf_mean_diff"]), 8),
+                "Mean (Positive)": f"{float(pattern['mean_positive_group']):.8f}",
+                "Mean (Other)": f"{float(pattern['mean_other']):.8f}",
+                "Mean Difference": f"{float(pattern['Inf_mean_diff']):.8f}",
                 "Influence Fair": format_bool_label(
                     bool(pattern["Inf_fair"]), streamlit_active
+                ),
+                "Cohen Fair": format_bool_label(
+                    bool(pattern["Cohen_fair"]), streamlit_active
                 ),
             }
         )
@@ -241,11 +244,14 @@ def print_one_influence_top_patterns(influence_top_patterns: dict, streamlit_act
         {
             "Influence Group": influence_top_patterns["group_col"],
             "Positive Group": influence_top_patterns["positive_group"],
-            "Mean (Positive)": f"{float(influence_top_patterns['mean_pos']):.8f}",
+            "Mean (Positive)": f"{float(influence_top_patterns['mean_positive_group']):.8f}",
             "Mean (Other)": f"{float(influence_top_patterns['mean_other']):.8f}",
             "Mean Difference": f"{float(influence_top_patterns['Inf_mean_diff']):.8f}",
             "Influence Fair": format_bool_label(
                 bool(influence_top_patterns["Inf_fair"]), streamlit_active
+            ),
+            "Cohen Fair": format_bool_label(
+                bool(influence_top_patterns["Cohen_fair"]), streamlit_active
             ),
         }
     ]
