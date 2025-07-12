@@ -1,6 +1,6 @@
 # Fairfluence
 
-A Python library for **profiling**, **influence-based quality assessment**, **AutoML performance evaluation**, and **fairness analysis** of tabular datasets from machine learning repositories like **OpenML**, **Kaggle**, and **Hugging Face**.
+A Python library for **profiling**, **influence-based quality assessment**, and **fairness analysis** of tabular datasets from machine learning repositories like **OpenML**, **Kaggle**, and **Hugging Face**.
 
 **Fairfluence** goes beyond standard profiling by training a model and using influence functions to identify which data points most affect the model’s predictions. This allows for precise fairness debugging and targeted quality analysis.
 
@@ -11,9 +11,8 @@ A Python library for **profiling**, **influence-based quality assessment**, **Au
 - Dataset ingestion from OpenML, Kaggle, Hugging Face
 - Automatic profiling: missing values, outliers, imbalance, redundant features
 - Model training and **influence score computation** per data point
-- **Data quality checks** via PyOD, focused on high-influence records
-- **Fairness analysis** using Fairlearn and sensitive attributes
-- AutoML evaluation for performance analysis
+- **Data quality checks** via focused on high-influence records
+- **Fairness analysis** using sensitive attributes
 - Visual report generation summarizing influence, quality, fairness, and performance
 - Supports inputting a dataset URL, choosing a model, viewing analysis and downloading the report through an interactive UI
 
@@ -30,9 +29,7 @@ fairfluence/
 │   │   ├── ingestorFactory.py      # 
 │   │   ├── laoder.py               #
 │   ├── preprocessing/             
-│   │   ├── base.py                 # Shared preprocessing logic (e.g. encoders, scalers)
-│   │   ├── quality.py              # Quality-specific preprocessing
-│   │   └── fairness.py             # Fairness-specific preprocessing
+│   │   ├── preprocessing.py        # complete preprocessing logic for data quality and fairness analysis
 │   ├── analysis/                   # Comparison, statistics & visualization
 │   │   ├── stats.py                # Summary stats, distributions, correlations
 │   │   ├── compare.py              # Before vs after comparisons
