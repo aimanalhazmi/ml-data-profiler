@@ -11,6 +11,9 @@ from src.model.registry import MODEL_REGISTRY
 from src.utils.output import *
 from multiprocessing import Process, Queue
 from tqdm import tqdm
+import random
+import numpy as np
+import config as cfg
 
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -333,6 +336,8 @@ def manual():
 
 
 if __name__ == "__main__":
+    random.seed(cfg.SEED)
+    np.random.seed(cfg.SEED)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode", choices=["manual", "auto"], default="manual", help="Run mode"

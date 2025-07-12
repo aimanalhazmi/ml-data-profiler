@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import os
+import random
+import numpy as np
+import config as cfg
 from src.ingestion.loader import load_dataset
 from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
@@ -9,9 +12,10 @@ from src.utils.output import *
 from pipeline import quality, fairness
 import time
 
+random.seed(cfg.SEED)
+np.random.seed(cfg.SEED)
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
-
 # Dataset Input
 input_method = st.radio("Choose dataset input method", ("URL", "Upload CSV"))
 
