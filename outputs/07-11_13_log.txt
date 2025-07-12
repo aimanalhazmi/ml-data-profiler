@@ -1,2 +1,0 @@
-[2025-07-11 13:48:52] Missing required fields - Dataset 3: https://www.kaggle.com/datasets/brendan45774/test-file
-[2025-07-11 13:48:56] Invalid target column or failure in analysis pipeline - Dataset 4: https://www.kaggle.com/datasets/ulrikthygepedersen/speed-dating/data

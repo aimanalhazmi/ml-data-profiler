@@ -1,4 +1,0 @@
-[2025-07-11 12:17:36] TIMEOUT - QUALITY - Dataset 2: https://huggingface.co/datasets/scikit-learn/adult-census-income
-[2025-07-11 12:17:36] TIMEOUT - FAIRNESS - Dataset 2: https://huggingface.co/datasets/scikit-learn/adult-census-income
-[2025-07-11 12:17:36] Missing required fields - Dataset 3: https://www.kaggle.com/datasets/brendan45774/test-file
-[2025-07-11 12:17:39] Invalid target column or failure in analysis pipeline - Dataset 4: https://www.kaggle.com/datasets/ulrikthygepedersen/speed-dating/data

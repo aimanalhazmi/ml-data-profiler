@@ -126,12 +126,12 @@ if "df" in st.session_state:
 
 @st.cache_data
 def run_quality_analysis(data, model_type, target_col):
-    return quality(data.copy(), model_type, target_col)
+    return quality(data, model_type, target_col)
 
 
 @st.cache_data
 def run_fairness_analysis(data, model_type, target_col):
-    return fairness(data.copy(), model_type, target_col)
+    return fairness(data, model_type, target_col)
 
 
 def display_result_section(title, results):
@@ -164,22 +164,31 @@ if "df" in st.session_state and st.session_state.target_column:
         st.session_state.model = MODEL_REGISTRY[supported_models[0]]
 
     # User-defined sampling
-    use_sample = st.checkbox("Sample dataset before training", value=True)
-    sample_frac = 0.25  # default
+    use_sample = st.checkbox("Sample dataset before training", value=False)
 
     if use_sample:
-        sample_frac = (
-            st.slider(
-                "Sampling fraction (%)", min_value=5, max_value=100, value=25, step=5
+        default_sample_frac = st.session_state.get("sample_frac", 0.25)
+        default_sample_percent = int(default_sample_frac * 100)
+
+        sample_percent = st.slider(
+            "Sampling fraction (%)",
+            min_value=5,
+            max_value=100,
+            value=default_sample_percent,
+            step=5,
+        )
+
+        sample_frac = sample_percent / 100
+        st.session_state.sample_frac = sample_frac
+        if sample_frac < 1.0:
+            st.session_state.reduced_df = df.sample(
+                frac=sample_frac, random_state=cfg.SEED
             )
-            / 100
-        )
-        reduced_df = df.sample(frac=sample_frac, random_state=42)
-        st.info(
-            f"Using {int(sample_frac * 100)}% of the dataset for training and analysis."
-        )
+        else:
+            st.session_state.reduced_df = df
+        st.info(f"Using {sample_percent}% of the dataset for training and analysis.")
     else:
-        reduced_df = df
+        st.session_state.reduced_df = df
 
     st.session_state.setdefault("quality_results", None)
     st.session_state.setdefault("fairness_results", None)
@@ -188,7 +197,7 @@ if "df" in st.session_state and st.session_state.target_column:
         with st.spinner("Running quality pipeline..."):
             quality_start = time.time()
             st.session_state.quality_results = run_quality_analysis(
-                data=reduced_df.copy(),
+                data=st.session_state.reduced_df.copy(),
                 model_type=st.session_state.model,
                 target_col=target_column,
             )
@@ -205,7 +214,7 @@ if "df" in st.session_state and st.session_state.target_column:
             with st.spinner("Running fairness pipeline..."):
                 fairness_start = time.time()
                 st.session_state.fairness_results = run_fairness_analysis(
-                    data=reduced_df.copy(),
+                    data=st.session_state.reduced_df.copy(),
                     model_type=st.session_state.model,
                     target_col=target_column,
                 )
