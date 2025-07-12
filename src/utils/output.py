@@ -420,7 +420,13 @@ def add_section(
 
 
 def save_results_to_pdf(
-    filepath, overview_summary, column_types, alerts, quality_results, fairness_results
+    filepath,
+    url,
+    overview_summary,
+    column_types,
+    alerts,
+    quality_results,
+    fairness_results,
 ):
     """Generates and saves the final PDF report with all analysis results."""
     doc = SimpleDocTemplate(filepath, pagesize=A4)
@@ -439,6 +445,18 @@ def save_results_to_pdf(
         ),
     )
     elements.append(main_title)
+
+    url_paragraph = Paragraph(
+        f'<font size="10">The dataset used to create this report: <a href="{url}">{url}</a></font>',
+        ParagraphStyle(
+            name="URLStyle",
+            parent=styles["Normal"],
+            alignment=1,
+            spaceAfter=12,
+        ),
+    )
+
+    elements.append(url_paragraph)
 
     add_section(
         "Dataset Summary",

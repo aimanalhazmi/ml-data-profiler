@@ -17,6 +17,7 @@ input_method = st.radio("Choose dataset input method", ("URL", "Upload CSV"))
 
 if input_method == "URL":
     url = st.text_input("Enter dataset URL (OpenML, Kaggle, HuggingFace)")
+    st.session_state.url = url
     if st.button("Load Dataset") and url:
         with st.spinner("Loading dataset..."):
             df = load_dataset(url)
@@ -25,6 +26,7 @@ if input_method == "URL":
 
 elif input_method == "Upload CSV":
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    st.session_state.url = "Uploaded file"
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.session_state.df = df
@@ -222,6 +224,7 @@ if "quality_results" in st.session_state and "fairness_results" in st.session_st
             column_types = print_column_type_summary(st.session_state.column_types)
             save_results_to_pdf(
                 filepath=report_path,
+                url=st.session_state.url,
                 overview_summary=st.session_state.summary,
                 column_types=column_types,
                 alerts=st.session_state.alerts,

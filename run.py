@@ -186,6 +186,7 @@ def run_pipeline_auto(datasets_path: str):
             os.makedirs(os.path.dirname(report_path), exist_ok=True)
             save_results_to_pdf(
                 filepath=report_path,
+                url=url,
                 overview_summary=result["overview_summary"],
                 column_types=result["column_types"],
                 alerts=result["alerts"],
@@ -259,6 +260,7 @@ def manual():
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
     save_results_to_pdf(
         filepath=report_path,
+        url=url,
         overview_summary=analysis_info["overview_summary"],
         column_types=analysis_info["column_types"],
         alerts=analysis_info["alerts"],
