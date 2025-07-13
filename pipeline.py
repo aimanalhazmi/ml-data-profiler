@@ -161,7 +161,7 @@ def fairness(df, model_type, target_column):
         target_column=target_column_fairness,
     )
     top_patterns = evaluate_patterns(
-        X_train_raw, min_support=0.05, top_k=5, max_predicates=1
+        X_train_raw, target_column_fairness, min_support=0.05, top_k=5, max_predicates=1
     )
 
     top_patterns_display = display_top_patterns(top_patterns=top_patterns)
