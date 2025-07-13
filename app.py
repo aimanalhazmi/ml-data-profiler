@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import os
+import random
+import numpy as np
+import config as cfg
 from src.ingestion.loader import load_dataset
 from src.analysis import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
@@ -9,14 +12,16 @@ from src.utils.output import *
 from pipeline import quality, fairness
 import time
 
+random.seed(cfg.SEED)
+np.random.seed(cfg.SEED)
 st.set_page_config(page_title="Fairfluence App", layout="wide")
 st.title("Fairfluence")
-
 # Dataset Input
 input_method = st.radio("Choose dataset input method", ("URL", "Upload CSV"))
 
 if input_method == "URL":
     url = st.text_input("Enter dataset URL (OpenML, Kaggle, HuggingFace)")
+    st.session_state.url = url
     if st.button("Load Dataset") and url:
         with st.spinner("Loading dataset..."):
             df = load_dataset(url)
@@ -25,6 +30,7 @@ if input_method == "URL":
 
 elif input_method == "Upload CSV":
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    st.session_state.url = "Uploaded file"
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.session_state.df = df
@@ -120,12 +126,12 @@ if "df" in st.session_state:
 
 @st.cache_data
 def run_quality_analysis(data, model_type, target_col):
-    return quality(data.copy(), model_type, target_col)
+    return quality(data, model_type, target_col)
 
 
 @st.cache_data
 def run_fairness_analysis(data, model_type, target_col):
-    return fairness(data.copy(), model_type, target_col)
+    return fairness(data, model_type, target_col)
 
 
 def display_result_section(title, results):
@@ -158,22 +164,31 @@ if "df" in st.session_state and st.session_state.target_column:
         st.session_state.model = MODEL_REGISTRY[supported_models[0]]
 
     # User-defined sampling
-    use_sample = st.checkbox("Sample dataset before training", value=True)
-    sample_frac = 0.25  # default
+    use_sample = st.checkbox("Sample dataset before training", value=False)
 
     if use_sample:
-        sample_frac = (
-            st.slider(
-                "Sampling fraction (%)", min_value=5, max_value=100, value=25, step=5
+        default_sample_frac = st.session_state.get("sample_frac", 0.25)
+        default_sample_percent = int(default_sample_frac * 100)
+
+        sample_percent = st.slider(
+            "Sampling fraction (%)",
+            min_value=5,
+            max_value=100,
+            value=default_sample_percent,
+            step=5,
+        )
+
+        sample_frac = sample_percent / 100
+        st.session_state.sample_frac = sample_frac
+        if sample_frac < 1.0:
+            st.session_state.reduced_df = df.sample(
+                frac=sample_frac, random_state=cfg.SEED
             )
-            / 100
-        )
-        reduced_df = df.sample(frac=sample_frac, random_state=42)
-        st.info(
-            f"Using {int(sample_frac * 100)}% of the dataset for training and analysis."
-        )
+        else:
+            st.session_state.reduced_df = df
+        st.info(f"Using {sample_percent}% of the dataset for training and analysis.")
     else:
-        reduced_df = df
+        st.session_state.reduced_df = df
 
     st.session_state.setdefault("quality_results", None)
     st.session_state.setdefault("fairness_results", None)
@@ -182,7 +197,7 @@ if "df" in st.session_state and st.session_state.target_column:
         with st.spinner("Running quality pipeline..."):
             quality_start = time.time()
             st.session_state.quality_results = run_quality_analysis(
-                data=reduced_df.copy(),
+                data=st.session_state.reduced_df.copy(),
                 model_type=st.session_state.model,
                 target_col=target_column,
             )
@@ -199,7 +214,7 @@ if "df" in st.session_state and st.session_state.target_column:
             with st.spinner("Running fairness pipeline..."):
                 fairness_start = time.time()
                 st.session_state.fairness_results = run_fairness_analysis(
-                    data=reduced_df.copy(),
+                    data=st.session_state.reduced_df.copy(),
                     model_type=st.session_state.model,
                     target_col=target_column,
                 )
@@ -222,6 +237,7 @@ if "quality_results" in st.session_state and "fairness_results" in st.session_st
             column_types = print_column_type_summary(st.session_state.column_types)
             save_results_to_pdf(
                 filepath=report_path,
+                url=st.session_state.url,
                 overview_summary=st.session_state.summary,
                 column_types=column_types,
                 alerts=st.session_state.alerts,

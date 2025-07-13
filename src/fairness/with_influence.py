@@ -29,7 +29,7 @@ def generate_simple_patterns(df, target_col, bin_numerical=True, bins=3):
     patterns = []
     feature_cols = [c for c in df.columns if c not in ignore_columns]
     patterns = []
-    for col in feature_cols:  # exclude 'influence'
+    for col in feature_cols:
         if pd.api.types.is_numeric_dtype(df[col]) and bin_numerical:
             binned = pd.qcut(df[col], bins, duplicates="drop")
             for interval in binned.unique():

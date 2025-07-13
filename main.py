@@ -11,6 +11,9 @@ from src.model.registry import MODEL_REGISTRY
 from src.utils.output import *
 from multiprocessing import Process, Queue
 from tqdm import tqdm
+import random
+import numpy as np
+import config as cfg
 
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -220,6 +223,7 @@ def run_pipeline_auto(datasets_path: str):
             os.makedirs(os.path.dirname(report_path), exist_ok=True)
             save_results_to_pdf(
                 filepath=report_path,
+                url=url,
                 overview_summary=result["overview_summary"],
                 column_types=result["column_types"],
                 alerts=result["alerts"],
@@ -317,6 +321,7 @@ def manual():
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
     save_results_to_pdf(
         filepath=report_path,
+        url=url,
         overview_summary=overview_summary,
         column_types=col_summary,
         alerts=alerts,
@@ -331,6 +336,8 @@ def manual():
 
 
 if __name__ == "__main__":
+    random.seed(cfg.SEED)
+    np.random.seed(cfg.SEED)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode", choices=["manual", "auto"], default="manual", help="Run mode"
@@ -349,5 +356,5 @@ if __name__ == "__main__":
     if args.mode == "manual":
         manual()
     else:
-        print("Run mode automatically!")
+        print("Run Fairfluence automatically!")
         run_pipeline_auto(args.datasets)

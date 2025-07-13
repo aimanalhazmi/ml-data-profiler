@@ -1,9 +1,13 @@
 from src.preprocessing.preprocessing import PreprocessorFactory
 from sklearn.model_selection import train_test_split
+import config as cfg
 from src.model.train import train_model
 from src.quality.compare import compare_outlier_removals
 from src.quality.clean import summarize_outliers
-from src.fairness.no_influence import compute_fairness_classical_metrics, compute_fairness_influence_metrics
+from src.fairness.no_influence import (
+    compute_fairness_classical_metrics,
+    compute_fairness_influence_metrics,
+)
 from src.fairness.with_influence import evaluate_patterns
 from src.influence.logistic_influence import LinearSVMInfluence, LogisticInfluence
 from src.utils.output import *
@@ -24,9 +28,6 @@ def preprocess_data(df, method, ohe, target_column, streamlit_active):
 
 
 def calculate_influence(originalX, X, y, X_index, model_type, target_column):
-    random_state = 42
-    test_size = 0.2
-
     # X is a dataframe, we should convert it to a numpy to suit the LinearSVMInfluence and LogisticInfluence
     X = X.values.astype(float)
     y = y.values.astype(float)
@@ -36,9 +37,9 @@ def calculate_influence(originalX, X, y, X_index, model_type, target_column):
         X,
         y,
         X_index,
-        test_size=test_size,
+        test_size=cfg.TEST_SIZE,
         stratify=y,
-        random_state=random_state,
+        random_state=cfg.SEED,
     )
 
     model = train_model(X_train, y_train, model_type=model_type)
@@ -59,11 +60,6 @@ def calculate_influence(originalX, X, y, X_index, model_type, target_column):
 
 
 def quality(df, model_type, target_column):
-    test_size = 0.2
-    random_state = 42
-    alpha = 0.01
-    sigma_multiplier = 1.0
-
     # Quality
     streamlit_active = is_streamlit_active()
     print_step_start(name="Quality")
@@ -84,7 +80,7 @@ def quality(df, model_type, target_column):
 
     # train split, model(Class),
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, stratify=y, random_state=random_state
+        X, y, test_size=cfg.TEST_SIZE, stratify=y, random_state=cfg.SEED
     )
     model = train_model(X_train.values, y_train.values, model_type)
 
@@ -95,8 +91,8 @@ def quality(df, model_type, target_column):
         y_test=y_test,
         num_cols=numeric_columns_quality,
         model=model,
-        alpha=alpha,
-        sigma_multiplier=sigma_multiplier,
+        alpha=cfg.ALPHA,
+        sigma_multiplier=cfg.SIGMA_MULTIPLIER,
         model_type=model_type,
     )
 
@@ -109,8 +105,8 @@ def quality(df, model_type, target_column):
         y_test=y_test,
         num_cols=numeric_columns_quality,
         model=model,
-        alpha=alpha,
-        sigma_multiplier=sigma_multiplier,
+        alpha=cfg.ALPHA,
+        sigma_multiplier=cfg.SIGMA_MULTIPLIER,
     )
 
     summary_display = display_outlier_summary(outlier_summary)
@@ -125,12 +121,6 @@ def quality(df, model_type, target_column):
 
 # Fairness
 def fairness(df, model_type, target_column):
-    test_size = 0.2
-    random_state = 42
-    dpd_tol = 0.1
-    eod_tol = 0.1
-    ppv_tol = 0.1
-    d_tol=0.2
 
     streamlit_active = is_streamlit_active()
     print_step_start(name="Fairness")
@@ -161,7 +151,11 @@ def fairness(df, model_type, target_column):
         target_column=target_column_fairness,
     )
     top_patterns = evaluate_patterns(
-        X_train_raw, target_column_fairness, min_support=0.05, top_k=5, max_predicates=1
+        X_train_raw,
+        target_column_fairness,
+        min_support=cfg.MIN_SUPPORT,
+        top_k=cfg.TOP_K,
+        max_predicates=cfg.MAX_PREDICATES,
     )
 
     top_patterns_display = display_top_patterns(top_patterns=top_patterns)
@@ -174,14 +168,23 @@ def fairness(df, model_type, target_column):
         X.copy(),
         y.copy(),
         df[sensitive_columns_fairness],
-        test_size=test_size,
+        test_size=cfg.TEST_SIZE,
         stratify=y,
-        random_state=random_state,
+        random_state=cfg.SEED,
     )
 
     model = train_model(X_train.values, y_train.values, model_type)
 
-    no_influence = compute_fairness_classical_metrics(X_test, y_test, s_test_df, df[sensitive_columns_fairness], model, dpd_tol=dpd_tol, eod_tol=eod_tol, ppv_tol=ppv_tol)
+    no_influence = compute_fairness_classical_metrics(
+        X_test,
+        y_test,
+        s_test_df,
+        df[sensitive_columns_fairness],
+        model,
+        dpd_tol=cfg.DPD_TOL,
+        eod_tol=cfg.EOD_TOL,
+        ppv_tol=cfg.PPV_TOL,
+    )
     no_influence_top_patterns.append(no_influence)
 
     for i in range(len(top_patterns)):
@@ -195,7 +198,7 @@ def fairness(df, model_type, target_column):
             X_train_raw,
             class_col=influence_group_col,
             positive_group=positive_group,
-            d_tol=d_tol,
+            d_tol=cfg.D_TOL,
         )
 
         influence_top_patterns.append(influence)
