@@ -17,6 +17,8 @@ def mahalanobis_outliers(X_train, X_test, num_cols, alpha = 0.01):
     X = full[num_cols].values
     mu = X.mean(axis=0)
     cov = np.cov(X, rowvar=False)
+    if cov.ndim == 0:
+        cov = cov.reshape(1, 1)
     eps = 1e-6
     cov_reg = cov + eps * np.eye(cov.shape[0])
     cov_inv = np.linalg.inv(cov_reg)
