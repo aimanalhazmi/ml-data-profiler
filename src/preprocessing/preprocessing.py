@@ -14,7 +14,7 @@ from sklearn.impute import KNNImputer, SimpleImputer
 from scipy.stats.mstats import winsorize
 import pandas as pd
 import numpy as np
-from pandas.api.types import is_float_dtype, is_numeric_dtype
+from pandas.api.types import is_float_dtype, is_numeric_dtype, is_categorical_dtype
 from src.preprocessing.preprocessing_dict import SENSITIVE_KEYWORDS
 from typing import Tuple, Dict
 
@@ -45,6 +45,7 @@ class Preprocessor:
                 text_columns: list of text column names (high unique ratio)
                 categorical_columns: list of categorical column names (low unique ratio)
         """
+
         drop_columns = [
             column
             for column in self.data.columns
@@ -55,6 +56,12 @@ class Preprocessor:
         text_columns, categorical_columns = [], []
         for column in self.data.columns:
             series = self.data[column]
+            series = series.replace({
+                "?"  : np.nan,
+                ""   : np.nan,
+                "NA" : np.nan,
+                "N/A": np.nan
+            })
             if pd.api.types.is_numeric_dtype(series) is False:
                 try:
                     series = series.astype(float)
@@ -68,13 +75,6 @@ class Preprocessor:
                     elif column != self.target_column and unique_values<=10:
                         categorical_columns.append(column)
         
-        """
-        numeric_columns = [
-            column
-            for column in numeric_columns
-            if column != self.target_column and column not in drop_columns
-        ]
-        """
         object_columns = self.data.select_dtypes(["object", "string"]).columns.tolist()
         object_columns = [
             column
@@ -83,6 +83,24 @@ class Preprocessor:
             and column not in drop_columns 
             and column not in numeric_columns
         ]
+
+        cat_dtype_cols = [
+            col for col in self.data.columns
+            if is_categorical_dtype(self.data[col])
+            and col not in drop_columns
+            and col not in numeric_columns
+        ]
+
+        bool_cols = self.data.select_dtypes("bool").columns.tolist()
+        bool_cols = [
+            column for column in bool_cols
+            if column != self.target_column 
+            and column not in drop_columns 
+            and column not in numeric_columns
+        ]
+
+        object_columns.extend(cat_dtype_cols)
+        object_columns.extend(bool_cols)
         
         for column in object_columns:
             unique_value_ratio = self.data[column].nunique() / self.data.shape[0]
@@ -106,7 +124,15 @@ class Preprocessor:
                 numeric_columns.remove(column)
         """
 
+        all_known = set(numeric_columns) | set(text_columns) | set(categorical_columns) | set(drop_columns)
+        for col in self.data.columns:
+            if col not in all_known and col != self.target_column:
+                categorical_columns.append(col)
+
         categorical_columns = np.unique(categorical_columns).tolist()
+        categorical_columns = np.unique(categorical_columns).tolist()
+        categorical_columns = np.unique(categorical_columns).tolist()
+ 
         return numeric_columns, text_columns, categorical_columns
 
     def receive_categorized_columns(self) -> Tuple[list, list]:
@@ -120,6 +146,11 @@ class Preprocessor:
             ]
         """
         numeric_columns, text_columns, categorical_columns = self.categorize_columns()
+
+        #for column in self.data.columns:
+        #    if column not in (numeric_columns or text_columns or categorical_columns):
+        #        print(column)
+
         sensitive_columns = self.find_sensitive_columns(self.data, text_columns)
         numeric_columns = [
             column for column in numeric_columns if column not in sensitive_columns
