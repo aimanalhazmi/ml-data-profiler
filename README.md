@@ -43,8 +43,11 @@ fairfluence/
 │   ├── ingestion/                  # Dataset loaders (OpenML, Kaggle, HF)
 │   │   ├── ingestorFactory.py      # Automatically recognises source of data, loads it and returns raw data
 │   │   ├── laoder.py               # Initializes ingestorFactory
+│   │   ├── test_ingestion.py       # Jupyternotebook for testing ingestion functionalities
 │   ├── preprocessing/             
 │   │   ├── preprocessing.py        # complete preprocessing logic for data quality and fairness analysis
+│   │   ├── preprocessing_dict.py   # Dictionary with all search words for identifying sensitive columns
+│   │   ├── preprocessing_test.py   # Jupyternotebook for testing preprocessing functionalities
 │   ├── profiling/                  # Statistics
 │   │   ├── stats.py                # Summary stats, distributions
 │   ├── model/
@@ -122,6 +125,8 @@ On Linux/macOS, run this to set proper permissions:
 chmod 600 ~/.kaggle/kaggle.json
 ```
 
+### Tipp
+- If you need a dataset for a quick start we can recommend: https://huggingface.co/datasets/scikit-learn/adult-census-income with the target column "income"
 
 ## ⚙️ Makefile Commands
 
@@ -200,6 +205,31 @@ This will:
 - Load all datasets from the JSON
 - Run both pipelines (quality and fairness)
 - Generate individual reports in `outputs/` for each dataset
+
+
+---
+
+## Evaluation
+We ran Fairfluence’s full pipeline on 100 tabular datasets.
+### Data‑Quality Results
+- **Statistical trimming** lead to highest F₁ value in **42.4%** of datasets.  
+- **Influence‑based trimming** lead to highest F₁ value in **19.2%** of datasets.  
+- In **38.4%** of cases both methods performed equally.
+- The difference in the resulting F1 value lies on average within **±1.6%** of the baseline.  
+- Overlap between the two outlier sets was only **0.61%**, confirming they capture different phenomena.
+
+### Fairness Results
+- **Classical parity metrics** (DPD, EOD, PPV) flagged **75%** of sensitive attributes as unfair.  
+- **Influence‑driven pattern mining** found **52%** of top‑*k* subgroups to be unfair—even outside classical sensitive columns.  
+- Only **15%** of those high‑impact patterns involved known sensitive attributes.  
+- Cohen’s _d_ agreed with the influence labels **52%** of the time (just **22%** flagged by Cohen’s _d_), highlighting influence mining’s greater sensitivity to small‑slice biases.
+
+## Discussion & Future Work
+
+Influence functions add a complementary, model‑aware lens that uncovers harmful points and subtle bias patterns classical methods miss. The main challenge remains choosing robust thresholds across diverse datasets. Future work should focus on:
+1. Faster influence‐score approximations  
+2. Data‐adaptive threshold selection  
+3. Expanded visualization and reporting features  
 
 ---
 

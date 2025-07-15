@@ -70,7 +70,7 @@ class IngestorFactory:
         else:
             raise ValueError("Unknown platform.")
 
-# load data from hugging face
+
 class HuggingFaceIngestor(BaseIngestor):
 
     SUPPORTED_FORMATS = {
@@ -127,10 +127,13 @@ class HuggingFaceIngestor(BaseIngestor):
         Returns:
             tuple[str, str]: Tuple of (file_url, file_format), where file_format is 'csv', 'json', or 'parquet'.
         """
+        # Iterate over the files listed in the dataset metadata
         for sibling in repo_info.siblings:
             filename = sibling.rfilename
+            # Check if the file has one of the supported extensions
             for format in self.SUPPORTED_FORMATS:
                 if filename.endswith(format):
+                    # Construct the direct download URL
                     file_url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
                     return file_url, self.SUPPORTED_FORMATS[format]
         raise FileNotFoundError("Found no fitting file")
@@ -152,20 +155,29 @@ class HuggingFaceIngestor(BaseIngestor):
         """
         Load the dataset from Hugging Face, convert it to CSV format, and optionally save it locally.
         The data is saved in the '../../data/' directory using the original file name.
+
+        Returns:
+            pd.DataFrame: The full dataset loaded into a DataFrame.
         """
+        # Step 1: determine the Hugging Face repo identifier
         repo_id = self.get_repo_id()
+        # Step 2: retrieve metadata (including file list)
         repo_info = self.get_repo_info(repo_id)
+        # Step 3: locate a supported file and its format
         file_link, file_format = self.get_file_url(repo_id,repo_info)
 
-
+        # Step 4: use the datasets library to load the specified file
         dataset = load_dataset(file_format, data_files=file_link)
+        # Assume a 'train' split by default
         dataset = dataset["train"]
-
+        # Step 5: derive a local name and write to CSV
         dataset_name = self.get_name(self.link)      
-
         save_path = f"../../data/{dataset_name}.csv"
         dataset.to_csv(save_path)
+
+        # Read back into pandas for uniform downstream handling
         df = pd.read_csv(save_path)
+        # Step 6: remove the temporary file if not requested to keep it
         if not self.save_file:
             os.remove(save_path)
         return df
@@ -206,12 +218,13 @@ class KaggleIngestor(BaseIngestor):
         api.authenticate()
         file_list = api.dataset_list_files(dataset_id).files
 
+        # Check that the file_index is within [0, len(file_list)-1]
         if self.file_index > len(file_list):
             raise IndexError(
                  f"file_index {self.file_index} is out of range. Dataset '{dataset_id}' contains only {len(file_list)} files."
             )
     
-    def get_dataset_id(self, link):
+    def get_dataset_id(self, link:str) -> str:
         """
         Extract the dataset ID from a Kaggle dataset URL.
 
@@ -235,31 +248,38 @@ class KaggleIngestor(BaseIngestor):
         Raises:
             RuntimeError: If the Kaggle API key is not found or configured.
         """
+        # Ensure Kaggle credentials are present
         if not self.is_kaggle_configured():
             raise RuntimeError(
                 "Kaggle API key not found. Please save `kaggle.json` in ~/.kaggle."
             )
+        # Authenticate with the Kaggle API
         api = KaggleApi()
         api.authenticate()
 
+        # Determine the filename based on the dataset ID and desired index
         file_name = self.get_name(dataset_id, self.file_index)
-        print(file_name)
-        #api.dataset_download_file(dataset_id, file_name=file_name, path=path, force=True)
+
+        # Download and unzip all files in the dataset to the target path
         api.dataset_download_files(dataset_id, path=path, unzip=True)
 
+        # Search through the unzipped directory structure for the target file
         src_path = None
         for root, dirs, files in os.walk(path):
             if file_name in files:
                 src_path = os.path.join(root, file_name)
                 break
 
+        # If the requested file wasn’t found, raise an error
         if src_path is None:
             raise FileNotFoundError(f"Could not find {file_name} after unzip in {path}")
         
+        # Move the file to the top level of `path` if it’s nested in subfolders
         dst_path = os.path.join(path, file_name)
         if src_path != dst_path:
             shutil.move(src_path, dst_path)
 
+        # Remove all other files and directories, leaving only the desired file
         for entry in os.listdir(path):
             full = os.path.join(path, entry)
             if entry == file_name:
@@ -268,8 +288,6 @@ class KaggleIngestor(BaseIngestor):
                 shutil.rmtree(full)
             else:
                 os.remove(full)
-
-
 
     def get_name(self, dataset_id: str, file_index: int) -> str:
         """
@@ -299,32 +317,23 @@ class KaggleIngestor(BaseIngestor):
         Raises:
             ValueError: If the file format is unsupported.
         """
+        # Construct full input and output file paths
         path = path + dataset_name
-
         ext = os.path.splitext(path)[1].lower()
-
         output_path = output_path + dataset_name.replace(ext, "") + ".csv"
 
-        """
-        if ext == ".csv":
-            try:
-                df = pd.read_csv(path)
-            except UnicodeDecodeError:
-                sample = None
-                with open(path, 'rb') as f:
-                    sample = f.read(10000)
-                detected = chardet.detect(sample)["encoding"]
-                df = pd.read_csv(path, encoding=detected, encoding_errors="replace")
-        """
+        # Handle delimited text formats, attempting to detect encoding and delimiter
         if ext == ".csv" or ext == ".tsv":
             with open(path, "rb") as f:
                 sample_bytes = f.read(10_000)
             detected = chardet.detect(sample_bytes)["encoding"] or "utf-8"
             sample_text = sample_bytes.decode(detected, errors="replace")
             try:
+                # Use Sniffer to guess the delimiter
                 dialect = csv.Sniffer().sniff(sample_text, delimiters=[",", ";", "\t", "|"])
                 sep = dialect.delimiter
             except csv.Error:
+                # Fallback heuristic: choose semicolon if more frequent than comma
                 sep = ";" if sample_text.count(";") > sample_text.count(",") else ","
             df = pd.read_csv(path,
                             sep=sep,
@@ -335,7 +344,7 @@ class KaggleIngestor(BaseIngestor):
             df = pd.read_csv(path, sep="\t")
         elif ext == ".json":
             df = pd.read_json(path)
-        elif ext == "parquet":
+        elif ext == ".parquet":
             df = pd.read_parquet(path)
         elif ext == ".xlsx":
             df = pd.read_excel(path)
@@ -369,14 +378,25 @@ class KaggleIngestor(BaseIngestor):
         - Convert to CSV
         - Remove raw file
         """
+        # Define temporary and output directories
         path = "../../data/kaggle_temp/" 
         output_path = "../../data/" 
+
+        # Step 1: determine the Kaggle dataset identifier
         dataset_id = self.get_dataset_id(self.link)
+
+        # Step 2: download the specified file into the temp directory
         self.download_kaggle_dataset(dataset_id, path)
+
+        # Step 3: derive the raw filename and convert it to CSV
         dataset_name = self.get_name(dataset_id, self.file_index)
         self.transform_raw_data(path, output_path, dataset_name)
+
+        # Step 4: remove the raw file after conversion
         self.delete_raw_data(path, dataset_name)
+        # Construct the path to the final CSV
         final_csv = output_path + dataset_name.replace(os.path.splitext(dataset_name)[1], "") + ".csv"
+        # Load the CSV into pandas
         df = pd.read_csv(final_csv)
         if not self.save_file:
             os.remove(final_csv)
@@ -442,18 +462,27 @@ class OpenMLIngestor(BaseIngestor):
         Load a dataset from OpenML, attach the target column if applicable,
         and save it as a CSV file in the local data directory.
         """
+        # Step 1: parse the numeric OpenML dataset ID from URL
         dataset_id = self.get_dataset_id(self.link)
-        print(dataset_id)
-        print(type(dataset_id))
+
+        # Step 2: fetch the dataset object and its raw data
         dataset = openml.datasets.get_dataset(dataset_id)
         dataset_name = dataset.name
         df, y, *_ = dataset.get_data()
+
+        # Step 3: if a target vector was returned, merge it into the DataFrame
         if y is not None:
             df = self.add_target_column(df, y, dataset)
+
+        # Sanitize dataset name for filesystem use
         dataset_name = dataset.name.replace(" ", "_")
         save_path = f"../../data/{dataset_name}.csv"
+
+        # Step 4: write out to CSV and reload for consistency
         df.to_csv(save_path, index=False)
         df = pd.read_csv(save_path)
+
+        # Step 5: remove the saved CSV if not requested to persist it
         if not self.save_file:
             os.remove(save_path)
         return df
