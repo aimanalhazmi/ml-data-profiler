@@ -14,7 +14,28 @@ from src.utils.output import *
 import time
 
 
-def preprocess_data(df, method, ohe, target_column, streamlit_active):
+def preprocess_data(
+    df: pd.DataFrame, method: str, ohe: bool, target_column: str, streamlit_active: bool
+):
+    """
+    Preprocess the dataset using the specified method.
+
+    Parameters:
+        df (pd.DataFrame): Input dataset.
+        method (str): Preprocessing strategy ("data quality" or "fairness").
+        ohe (bool): Whether to apply one-hot encoding.
+        target_column (str): Column to predict.
+        streamlit_active (bool): Whether Streamlit is running.
+
+    Returns:
+        Tuple containing:
+            transformed_data (pd.DataFrame): Final preprocessed DataFrame.
+            numeric_columns (List[str]): List of numeric column names.
+            categorical_columns (List[str]): List of categorical feature names.
+            text_columns_transformed (List[str]): List of text embedding names.
+            sensitive_columns (List[str]): List of sensitive column names.
+            target_column (str): Placeholder for target column.
+    """
     preprocessor_factory = PreprocessorFactory(
         data=df, method=method, target_column=target_column
     )
@@ -27,12 +48,31 @@ def preprocess_data(df, method, ohe, target_column, streamlit_active):
     return processed_data_dict
 
 
-def calculate_influence(originalX, X, y, X_index, model_type, target_column):
-    # X is a dataframe, we should convert it to a numpy to suit the LinearSVMInfluence and LogisticInfluence
+def calculate_influence(
+    originalX: pd.DataFrame,
+    X: pd.DataFrame,
+    y: pd.Series,
+    X_index: pd.Index,
+    model_type: str,
+    target_column: str,
+) -> pd.DataFrame:
+    """
+    Train a model and calculate influence scores on training data.
+
+    Parameters:
+        originalX (pd.DataFrame): Original data.
+        X (pd.DataFrame): Feature matrix.
+        y (pd.Series): Target labels.
+        X_index (pd.Index): Index of the full dataset.
+        model_type (str): Model type ("svm" or "logistic").
+        target_column (str): Name of the target column.
+
+    Returns:
+        pd.DataFrame: Training samples with influence scores.
+    """
     X = X.values.astype(float)
     y = y.values.astype(float)
 
-    # If we split dataframe, it is still dataframe, if numpy then  numpy
     X_train, X_test, y_train, y_test, train_index, test_index = train_test_split(
         X,
         y,
@@ -59,7 +99,18 @@ def calculate_influence(originalX, X, y, X_index, model_type, target_column):
     return X_train_raw
 
 
-def quality(df, model_type, target_column):
+def quality(df: pd.DataFrame, model_type: str, target_column: str):
+    """
+    Perform data quality checks and summarize outlier handling.
+
+    Parameters:
+        df (pd.DataFrame): Input dataset.
+        model_type (str): Model type to train.
+        target_column (str): Column to predict.
+
+    Returns:
+        list of tuples: Descriptive summaries of quality results.
+    """
     # Quality
     streamlit_active = is_streamlit_active()
     print_step_start(name="Quality")
@@ -120,7 +171,18 @@ def quality(df, model_type, target_column):
 
 
 # Fairness
-def fairness(df, model_type, target_column):
+def fairness(df: pd.DataFrame, model_type: str, target_column: str):
+    """
+    Perform fairness analysis with and without influence functions.
+
+    Parameters:
+        df (pd.DataFrame): Input dataset.
+        model_type (str): Model type to train.
+        target_column (str): Target column name.
+
+    Returns:
+        list of tuples: Top patterns, fairness metrics and influence-based results.
+    """
 
     streamlit_active = is_streamlit_active()
     print_step_start(name="Fairness")

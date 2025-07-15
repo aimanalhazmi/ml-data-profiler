@@ -1,22 +1,12 @@
 {
-        "https://www.kaggle.com/datasets/therohithanand/student-academic-performance-dataset": {
-        "platform": "www.kaggle.com",
-        "target_column": "final_result",
-        "no_dataset": 1
-    },
     "https://huggingface.co/datasets/scikit-learn/adult-census-income": {
         "platform": "huggingface.co",
         "target_column": "income",
         "no_dataset": 1
     },
-      "https://www.kaggle.com/datasets/brendan45774/test-file": {
+    "https://www.kaggle.com/datasets/fatemehmohammadinia/heart-attack-dataset-tarik-a-rashid": {
         "platform": "www.kaggle.com",
-        "target_column": "",
-        "no_dataset": 1
-    },
-      "https://www.kaggle.com/datasets/ulrikthygepedersen/speed-dating/data": {
-        "platform": "www.kaggle.com",
-        "target_column": "ball",
+        "target_column": "Result",
         "no_dataset": 1
     }
 }

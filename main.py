@@ -21,7 +21,28 @@ LOG_TO = os.path.join(os.getcwd(), "outputs")
 failed_datasets = []
 
 
-def run_analysis(df, target_column, model_type, idx=None, url=None, timeout=3600):
+def run_analysis(
+    df: pd.DataFrame,
+    target_column: str,
+    model_type: str,
+    idx: int | None = None,
+    url: str | None = None,
+    timeout: int = 3600,
+):
+    """
+    Runs the complete analysis pipeline (profiling, quality and fairness) on a single dataset.
+
+    Parameters:
+        df (pd.DataFrame): Input dataset
+        target_column (str): Name of the target column
+        model_type (str): Model from MODEL_REGISTRY
+        idx (int, optional): Index for logging/reporting
+        url (str, optional): Dataset URL
+        timeout (int, optional): Max runtime in seconds
+
+    Returns:
+        dict or None: Dictionary of analysis results or None on failure
+    """
     overview_summary = stats.dataset_summary(df)
     print(tabulate(overview_summary, headers="keys", tablefmt="grid", showindex=False))
     dqp = Preprocessor(df, target_column="")
@@ -66,9 +87,6 @@ def run_analysis(df, target_column, model_type, idx=None, url=None, timeout=3600
     if quality_results is None or fairness_results is None:
         return None
 
-    # quality_results = quality(df.copy(), model_type, target_column)
-    # fairness_results = fairness(df.copy(), model_type, target_column)
-
     return {
         "overview_summary": overview_summary,
         "column_types": col_summary,
@@ -82,6 +100,17 @@ def run_analysis(df, target_column, model_type, idx=None, url=None, timeout=3600
 def check_target_col(
     df: pd.DataFrame, target_column: str, valid_columns: list
 ) -> str | None:
+    """
+    Validate or auto-select a target column.
+
+    Parameters:
+        df (pd.DataFrame): The dataset.
+        target_column (str): Suggested target column.
+        valid_columns (list[str]): Valid column names.
+
+    Returns:
+        str | None: A valid column name or None if invalid.
+    """
     if target_column in valid_columns:
         return target_column
     if target_column:
@@ -96,8 +125,26 @@ def check_target_col(
 
 
 def run_quality_and_fairness(
-    df, model_type, target_column, timeout=None, idx=1, url=None
+    df: pd.DataFrame,
+    model_type: str,
+    target_column: str,
+    timeout: int | None = None,
+    idx: int = 1,
+    url: str | None = None,
 ):
+    """
+    Run quality and fairness checks in parallel using multiprocessing.
+
+    Parameters:
+        df (pd.DataFrame): The dataset.
+        model_type (str): The model to use.
+        target_column (str): The column to predict.
+        timeout (int | None): Max execution time.
+        idx (int): Dataset index (default: 1).
+        url (str | None): Dataset URL.
+    Returns:
+        tuple: ((quality_results, quality_output), (fairness_results, fairness_output))
+    """
     q1 = Queue()
     q2 = Queue()
 
@@ -156,6 +203,15 @@ def run_quality_and_fairness(
 
 
 def run_pipeline_auto(datasets_path: str):
+    """
+    Automatically runs the analysis pipeline on datasets from a config JSON file.
+
+    Parameters:
+        datasets_path (str): Path to JSON file containing dataset config.
+
+    Returns:
+        None
+    """
     all_results = []
 
     if not datasets_path or not os.path.exists(datasets_path):
@@ -241,6 +297,17 @@ def run_pipeline_auto(datasets_path: str):
 
 
 def manual():
+    """
+    Interactive CLI for running the analysis pipeline on a single dataset.
+
+    Prompts the user for:
+    - Dataset URL
+    - File number
+    - Target column
+    - Model type
+
+    Performs analysis and generates a report in outputs/.
+    """
     print("===    Fairfluence   ===")
 
     url = input("Enter dataset URL (OpenML, Kaggle, HuggingFace): ").strip()

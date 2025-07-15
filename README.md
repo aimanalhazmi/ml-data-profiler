@@ -1,45 +1,58 @@
-# Fairfluence
+# Fairfluence  
+*Influence-Based Data Quality and Fairness Analysis for Tabular ML Datasets*
 
-A Python library for **profiling**, **influence-based quality assessment**, and **fairness analysis** of tabular datasets from machine learning repositories like **OpenML**, **Kaggle**, and **Hugging Face**.
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+![Streamlit App](https://img.shields.io/badge/Run%20via-Streamlit-blueviolet)
 
-**Fairfluence** goes beyond standard profiling by training a model and using influence functions to identify which data points most affect the model’s predictions. This allows for precise fairness debugging and targeted quality analysis.
+
+Fairfluence is a modular Python library for **data profiling**, **outlier detection** and **fairness analysis** in tabular machine learning datasets. It combines classical statistical techniques with **influence functions** to help identify data points that degrade model performance or introduce bias — with an interactive UI and exportable reports.
 
 ---
 
 ## 📦 Features
 
-- Dataset ingestion from OpenML, Kaggle, Hugging Face
-- Automatic profiling: missing values, outliers, imbalance, redundant features
-- Model training and **influence score computation** per data point
-- **Data quality checks** via focused on high-influence records
-- **Fairness analysis** using sensitive attributes
-- Visual report generation summarizing influence, quality, fairness, and performance
-- Supports inputting a dataset URL, choosing a model, viewing analysis and downloading the report through an interactive UI
+- **Dataset ingestion** from Kaggle, OpenML, and Hugging Face
+- **Automated data profiling**: missing values, duplicates, class balance
+- Dual-pipeline outlier detection: **statistical (Mahalanobis)** vs. **influence-based**
+- **Fairness analysis** using:
+  - Traditional metrics (DPD, EOD, PPV)
+  - Influence-based **pattern analysis**
+- Generates visual reports summarizing **influence**, **data quality**, **fairness** and **model performance**
+- Interactive UI that lets you input a **dataset URL (Kaggle, OpenML, or Hugging Face)**, select a model, run the analysis and download the full report
+---
+
+
+## ▶️ How It Works
+
+Fairfluence computes **influence scores** using convex models like logistic regression or SVM. These scores indicate how much each training point affects model predictions.
+
+You can then:
+- Flag and remove high-influence outliers
+- Compare statistical vs. influence-based removal effects
+- Discover fairness issues in small but high-impact subgroups
+- Generate a PDF report and visual summaries
 
 ---
 
-## 🔧 Project Structure
+## 🗂️ Project Structure
 
 ```
 fairfluence/
 ├── data/                           # Downloaded datasets and local CSVs
-├── notebooks/                      # Exploratory notebooks for analysis & prototyping
 ├── src/
 │   ├── ingestion/                  # Dataset loaders (OpenML, Kaggle, HF)
 │   │   ├── ingestorFactory.py      # Automatically recognises source of data, loads it and returns raw data
 │   │   ├── laoder.py               # Initializes ingestorFactory
 │   ├── preprocessing/             
 │   │   ├── preprocessing.py        # complete preprocessing logic for data quality and fairness analysis
-│   ├── analysis/                   # Comparison, statistics & visualization
-│   │   ├── stats.py                # Summary stats, distributions, correlations
-│   │   ├── compare.py              # Before vs after comparisons
-│   │   ├── visual.py               # Matplotlib/seaborn/plotly plots
+│   ├── profiling/                  # Statistics
+│   │   ├── stats.py                # Summary stats, distributions
 │   ├── model/
-│   │   ├── builder.py              # ModelBuilder class to manage model types
 │   │   ├── registry.py             # Model registry or config-driven loader
 │   │   ├── train.py                # Model training
 │   ├── influence/                  # Influence score computation
-│   │   ├── compute.py              #
+│   │   ├── base.py                 #
+│   │   ├── logistic_influence.py   #
 │   ├── quality/
 │   │   ├── no_influence.py         # Quality checks without influence
 │   │   ├── with_influence.py       # Quality analysis with influence
@@ -47,12 +60,11 @@ fairfluence/
 │   ├── fairness/
 │   │   ├── no_influence.py         # Fairness metrics (no influence)
 │   │   ├── with_influence.py       # Fairness + influence debugging
-│   │   └── clean.py                # Fairness-based filtering/repair
-│   ├── utils/                      # Shared helper functions (logging, configuration)
+│   ├── utils/                      # Shared helper functions (output-related helpers, logging, configuration)
 ├── outputs/                        # Generated reports, scores, visualizations
 ├── tests/                          # Unit tests for individual modules
 ├── app.py                          # Streamlit UI entry point
-├── main.py                         # End-to-end CLI script to run the full pipeline
+├── main.py                         # CLI pipeline runner
 ├── requirements.txt                # Project dependencies
 ├── Makefile                        # Build and setup commands
 └── README.md                       # Project documentation
@@ -92,17 +104,23 @@ You can now select **fairfluence** as a kernel in Jupyter Notebook/Lab.
 ### 5. Use Kaggle API (optional)
 To be able to use datasets from Kaggle, and as thus the API from Kaggle, you need an API token. Follow these steps:
 1. **Create or log in to your Kaggle account**  
-   Go to [kaggle.com](https://www.kaggle.com) and sign up or log in.
+   Visit [kaggle.com](https://www.kaggle.com) and sign up or log in.
 
 2. **Generate an API token**  
    - Click on your profile picture (top right) and select **“My Account”**.  
    - Scroll down to the **“API”** section and click **“Create New API Token”**.  
    - A file named `kaggle.json` will be downloaded to your computer.
   
-3. **Create the `.kaggle` folder**  
-   Open File Explorer and navigate to your user’s home directory, for example:  C:\Users<YourUserName>\
-   If it doesn’t already exist, create a hidden folder called `.kaggle`: C:\Users\<YourUserName>\.kaggle
-   Copy the downloaded kaggle.json into the new folder.
+3. **Create the `.kaggle` folder and add the token**
+Move the downloaded kaggle.json file to the .kaggle folder inside your home directory:
+   - **Windows**: C:\\Users\\<YourUserName>\\.kaggle\\kaggle.json
+   - **Linux/macOS**: ~/.kaggle/kaggle.json
+
+If the .kaggle folder doesn't exist, create it manually.
+On Linux/macOS, run this to set proper permissions:
+```bash
+chmod 600 ~/.kaggle/kaggle.json
+```
 
 
 ## ⚙️ Makefile Commands
@@ -118,16 +136,71 @@ To be able to use datasets from Kaggle, and as thus the API from Kaggle, you nee
 
 ---
 
-## 📈 Example Usage (after setup)
+## How to Run
 
-### Run Streamlit App
+Fairfluence can be used in three ways:
+
+### Streamlit App (Optional GUI)
 ```bash
-streamlit run app.py  
+streamlit run app.py
 ```
-### Run CLI Pipeline
+This launches a web interface where you can:
+
+- Input a dataset URL (Kaggle, OpenML, Hugging Face)
+- Choose model and target column 
+- Visualize profiling and analysis results interactively 
+- Download a detailed PDF report
+
+---
+### Manual Mode (Interactive CLI)
 ```bash
 python main.py
 ```
+You’ll be prompted to:
+
+- Enter a dataset URL (Kaggle, OpenML, or Hugging Face)
+- Choose a target column (or auto-select one)
+- Select a model (e.g., Logistic Regression, Support Vector Machine)
+
+The system will:
+
+- Run data profiling, outlier detection, and fairness analysis
+- Generate a visual PDF report at:  
+  `outputs/final_report.pdf`
+
+---
+
+### Auto Mode (Batch via JSON Config)
+
+#### 1. Create a config file (e.g., `datasets.json`)
+
+```json
+{
+  "https://huggingface.co/datasets/scikit-learn/adult-census-income": {
+     "platform": "huggingface.co",
+      "target_column": "income",
+      "no_dataset": 1,
+      "model_type": "Logistic Regression",
+      "timeout": 3600
+  },
+  "https://www.kaggle.com/datasets/...": {
+    "target_column": "target",
+    "model_type": "Support Vector Machine"
+  }
+}
+```
+
+#### 2. Run Fairfluence in auto mode
+
+```bash
+python main.py --mode auto --datasets datasets.json
+```
+
+This will:
+- Load all datasets from the JSON
+- Run both pipelines (quality and fairness)
+- Generate individual reports in `outputs/` for each dataset
+
 ---
 
 ## 👥 Contributors

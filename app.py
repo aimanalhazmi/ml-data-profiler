@@ -232,7 +232,7 @@ if "quality_results" in st.session_state and "fairness_results" in st.session_st
     st.markdown("---")
     if st.button("Generate Final Report"):
         with st.spinner("Generating report..."):
-            report_path = "outputs/final_report.pdf"
+            report_path = "outputs/2/final_report.pdf"
             os.makedirs(os.path.dirname(report_path), exist_ok=True)
             column_types = print_column_type_summary(st.session_state.column_types)
             save_results_to_pdf(
