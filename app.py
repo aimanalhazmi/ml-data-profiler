@@ -5,12 +5,43 @@ import random
 import numpy as np
 import config as cfg
 from src.ingestion.loader import load_dataset
-from src.analysis import stats
+from src.profiling import stats
 from src.preprocessing.preprocessing import Preprocessor as DQP
 from src.model.registry import MODEL_REGISTRY
 from src.utils.output import *
 from pipeline import quality, fairness
 import time
+
+
+def clear_outputs():
+    keys_to_clear = [
+        "df",
+        "summary",
+        "column_types",
+        "alerts",
+        "target_column",
+        "model",
+        "sample_frac",
+        "reduced_df",
+        "quality_results",
+        "fairness_results",
+        "report_path",
+    ]
+    for key in keys_to_clear:
+        st.session_state.pop(key, None)
+
+
+@st.cache_data
+def run_fairness_analysis(data, model_type, target_col):
+    return fairness(data, model_type, target_col)
+
+
+def display_result_section(title, results):
+    with st.expander(title, expanded=True):
+        for section_title, df_section in results:
+            st.subheader(section_title)
+            st.dataframe(df_section)
+
 
 random.seed(cfg.SEED)
 np.random.seed(cfg.SEED)
@@ -23,6 +54,7 @@ if input_method == "URL":
     url = st.text_input("Enter dataset URL (OpenML, Kaggle, HuggingFace)")
     st.session_state.url = url
     if st.button("Load Dataset") and url:
+        clear_outputs()
         with st.spinner("Loading dataset..."):
             df = load_dataset(url)
             st.session_state.df = df
@@ -32,6 +64,7 @@ elif input_method == "Upload CSV":
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
     st.session_state.url = "Uploaded file"
     if uploaded_file is not None:
+        clear_outputs()
         df = pd.read_csv(uploaded_file)
         st.session_state.df = df
         st.success("CSV file loaded successfully!")
@@ -129,18 +162,6 @@ def run_quality_analysis(data, model_type, target_col):
     return quality(data, model_type, target_col)
 
 
-@st.cache_data
-def run_fairness_analysis(data, model_type, target_col):
-    return fairness(data, model_type, target_col)
-
-
-def display_result_section(title, results):
-    with st.expander(title, expanded=True):
-        for section_title, df_section in results:
-            st.subheader(section_title)
-            st.dataframe(df_section)
-
-
 # Model Selection
 if "df" in st.session_state and st.session_state.target_column:
     st.markdown("---")
@@ -192,7 +213,8 @@ if "df" in st.session_state and st.session_state.target_column:
 
     st.session_state.setdefault("quality_results", None)
     st.session_state.setdefault("fairness_results", None)
-    if st.button("Train Model & Run Quality"):
+
+    if st.button("Run Quality Analysis"):
         st.session_state.quality_results = None
         with st.spinner("Running quality pipeline..."):
             quality_start = time.time()
@@ -205,55 +227,54 @@ if "df" in st.session_state and st.session_state.target_column:
                 name="Quality", start_time=quality_start, streamlit_active=True
             )
             st.success(messages)
+
     if st.session_state.quality_results:
         display_result_section("📊 Quality Results", st.session_state.quality_results)
 
-    if st.session_state.quality_results:
-        if st.button("Run Fairness Analysis"):
-            st.session_state.fairness_results = None
-            with st.spinner("Running fairness pipeline..."):
-                fairness_start = time.time()
-                st.session_state.fairness_results = run_fairness_analysis(
-                    data=st.session_state.reduced_df.copy(),
-                    model_type=st.session_state.model,
-                    target_col=target_column,
-                )
-                messages = print_step_end(
-                    name="Fairness", start_time=fairness_start, streamlit_active=True
-                )
-                st.success(messages)
+    if st.button("Run Fairness Analysis"):
+        st.session_state.fairness_results = None
+        with st.spinner("Running fairness pipeline..."):
+            fairness_start = time.time()
+            st.session_state.fairness_results = run_fairness_analysis(
+                data=st.session_state.reduced_df.copy(),
+                model_type=st.session_state.model,
+                target_col=target_column,
+            )
+            messages = print_step_end(
+                name="Fairness", start_time=fairness_start, streamlit_active=True
+            )
+            st.success(messages)
 
-    # Show fairness results
     if st.session_state.fairness_results:
         display_result_section("⚖️ Fairness Results", st.session_state.fairness_results)
 
-# Final Report Viewer
-if "quality_results" in st.session_state and "fairness_results" in st.session_state:
-    st.markdown("---")
-    if st.button("Generate Final Report"):
-        with st.spinner("Generating report..."):
-            report_path = "outputs/2/final_report.pdf"
-            os.makedirs(os.path.dirname(report_path), exist_ok=True)
-            column_types = print_column_type_summary(st.session_state.column_types)
-            save_results_to_pdf(
-                filepath=report_path,
-                url=st.session_state.url,
-                overview_summary=st.session_state.summary,
-                column_types=column_types,
-                alerts=st.session_state.alerts,
-                quality_results=st.session_state.quality_results,
-                fairness_results=st.session_state.fairness_results,
-            )
-            st.session_state.report_path = report_path
-        st.success("Report generated!")
+    # Final Report Viewer
+    if st.session_state.quality_results or st.session_state.fairness_results:
+        st.markdown("---")
+        if st.button("Generate Final Report"):
+            with st.spinner("Generating report..."):
+                report_path = "outputs/2/final_report.pdf"
+                os.makedirs(os.path.dirname(report_path), exist_ok=True)
+                column_types = print_column_type_summary(st.session_state.column_types)
+                save_results_to_pdf(
+                    filepath=report_path,
+                    url=st.session_state.url,
+                    overview_summary=st.session_state.summary,
+                    column_types=column_types,
+                    alerts=st.session_state.alerts,
+                    quality_results=st.session_state.quality_results,
+                    fairness_results=st.session_state.fairness_results,
+                )
+                st.session_state.report_path = report_path
+            st.success("Report generated!")
 
-    if "report_path" in st.session_state and os.path.exists(
-        st.session_state.report_path
-    ):
-        with open(st.session_state.report_path, "rb") as f:
-            st.download_button(
-                label="Download Final Report",
-                data=f,
-                file_name=os.path.basename(st.session_state.report_path),
-                mime="application/pdf",
-            )
+        if "report_path" in st.session_state and os.path.exists(
+            st.session_state.report_path
+        ):
+            with open(st.session_state.report_path, "rb") as f:
+                st.download_button(
+                    label="Download Final Report",
+                    data=f,
+                    file_name=os.path.basename(st.session_state.report_path),
+                    mime="application/pdf",
+                )

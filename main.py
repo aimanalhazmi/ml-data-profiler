@@ -5,7 +5,7 @@ import json
 from pipeline import quality, fairness
 from sklearn.exceptions import ConvergenceWarning
 from src.ingestion.loader import load_dataset
-from src.analysis import stats
+from src.profiling import stats
 from src.preprocessing.preprocessing import Preprocessor
 from src.model.registry import MODEL_REGISTRY
 from src.utils.output import *

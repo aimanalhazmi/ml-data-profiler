@@ -221,7 +221,7 @@ def print_influence_top_patterns(influence_top_patterns: list[dict], streamlit_a
     for pattern in influence_top_patterns:
         influence_summary.append(
             {
-               "Influence Group": pattern["group_col"],
+                "Influence Group": pattern["group_col"],
                 "Positive Group": pattern["positive_group"],
                 "Mean (Positive)": f"{float(pattern['mean_positive_group']):.8f}",
                 "Mean (Other)": f"{float(pattern['mean_other']):.8f}",
@@ -475,11 +475,13 @@ def save_results_to_pdf(
     add_section(
         "Alerts", [("", alerts)], elements, styles, page_width - 2 * cm, is_alerts=True
     )
-    add_section(
-        "Quality Results", quality_results, elements, styles, page_width - 2 * cm
-    )
-    add_section(
-        "Fairness Results", fairness_results, elements, styles, page_width - 2 * cm
-    )
+    if quality_results:
+        add_section(
+            "Quality Results", quality_results, elements, styles, page_width - 2 * cm
+        )
+    if fairness_results:
+        add_section(
+            "Fairness Results", fairness_results, elements, styles, page_width - 2 * cm
+        )
 
     doc.build(elements)
