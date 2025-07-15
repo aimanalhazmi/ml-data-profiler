@@ -8,4 +8,4 @@ __pycache__/
 data/*.csv
 tests/Dataset
 .streamlit
-outputs/
+outputs
