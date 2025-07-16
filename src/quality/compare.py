@@ -9,8 +9,7 @@ from src.quality.with_influence import influence_outliers
 from src.model.train import train_model
 
 
-# Trains and evaluates on original data, then again without statistical outliers and then once more without influence based outliers
-# model must be trained before. model_type is the model on which we calculate f1
+
 def compare_outlier_removals(
     X_train,
     X_test,
@@ -22,6 +21,27 @@ def compare_outlier_removals(
     sigma_multiplier=1.0,
     model_type="logistic",
 ):
+    """
+    Compare F₁ performance of a baseline model versus
+    models retrained after statistical and influence-based outlier removal.
+
+    Args:
+        X_train (pd.DataFrame): Training feature set.
+        X_test (pd.DataFrame): Test feature set.
+        y_train (pd.Series): Training target labels.
+        y_test (pd.Series): Test target labels.
+        num_cols (list[str]): Names of numeric columns for Mahalanobis analysis.
+        model: A model instance used by the influence_outliers function to compute influence.
+        alpha (float): Significance level for the χ² cutoff in Mahalanobis outlier detection.
+        sigma_multiplier (float): Multiplier for the influence‐based outlier threshold.
+        model_type (str): Identifier passed to `train_model` to select and configure the classifier.
+
+    Returns:
+        pd.DataFrame: Single-row DataFrame with rounded F₁ scores for:
+            - "f1_orig": baseline model on original data
+            - "f1_statistic": model after removing Mahalanobis outliers
+            - "f1_influence": model after removing influence‐based outliers
+    """
     n_classes = y_test.nunique()
     average = "binary" if n_classes == 2 else "weighted"
 

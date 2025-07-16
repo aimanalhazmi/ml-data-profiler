@@ -9,10 +9,6 @@ sys.path.insert(0, SRC)
 from src.influence.logistic_influence import LogisticInfluence
 
 
-# This flags the really influential rows in your dataset based on a logistic‐influence score.
-# It slects those that deviate "sigma_multiplier" standard deviations from the mean.
-# frac is just the amount of test points used to calculate influence, preferably low.
-# Recieves the split data and the TRAINED model as a parameter
 def influence_outliers(
     X_train,
     X_test,
@@ -23,6 +19,39 @@ def influence_outliers(
     random_state=912,
     sigma_multiplier=3.0,
 ):
+    """
+    Flag outliers based on model‐aware influence scores using logistic influence functions.
+
+    This function computes the average influence of each training point on a
+    (sub)sample of test points, and flags those whose influence exceeds a
+    threshold defined by mean + sigma_multiplier·std (clamped at zero).
+
+    Args:
+        X_train (pd.DataFrame or np.ndarray):
+            Training feature set.
+        X_test (pd.DataFrame or np.ndarray):
+            Test feature set.
+        y_train (pd.Series or np.ndarray):
+            Training labels.
+        y_test (pd.Series or np.ndarray):
+            Test labels.
+        model:
+            A trained model instance (e.g., scikit learn estimator) compatible
+            with LogisticInfluence.
+        frac (float):
+            Fraction of X_test to sample for influence computation (default=0.001).
+        random_state (int):
+            Random seed for sampling test subset (default=912).
+        sigma_multiplier (float):
+            Multiplier for the standard deviation when setting the positive threshold
+            (default=3.0).
+
+    Returns:
+        np.ndarray of bool, shape=(n_train + n_test,):
+            Boolean mask where True indicates a training point whose average
+            influence on the sampled test set exceeds the threshold.
+    """
+    # Optionally subsample the test set to limit computation
     if frac < 1.0:
         X_te = X_test.sample(frac=frac, random_state=random_state)
         y_te = y_test.loc[X_te.index]
@@ -36,6 +65,7 @@ def influence_outliers(
         X_te.values.astype(np.float64), y_te.values.astype(np.float64)
     )
 
+    # Determine threshold: mean + multiplier·std, clamped at zero
     mu = avg_inf.mean()
     sigma = avg_inf.std()
     thresh = max(mu + sigma_multiplier * sigma, 0.0)  # Keep only positive points!

@@ -42,7 +42,7 @@ fairfluence/
 ├── src/
 │   ├── ingestion/                  # Dataset loaders (OpenML, Kaggle, HF)
 │   │   ├── ingestorFactory.py      # Automatically recognises source of data, loads it and returns raw data
-│   │   ├── laoder.py               # Initializes ingestorFactory
+│   │   ├── loader.py               # Initializes ingestorFactory
 │   │   ├── test_ingestion.py       # Jupyternotebook for testing ingestion functionalities
 │   ├── preprocessing/             
 │   │   ├── preprocessing.py        # complete preprocessing logic for data quality and fairness analysis
@@ -57,9 +57,10 @@ fairfluence/
 │   │   ├── base.py                 #
 │   │   ├── logistic_influence.py   #
 │   ├── quality/
-│   │   ├── no_influence.py         # Quality checks without influence
-│   │   ├── with_influence.py       # Quality analysis with influence
-│   │   └── clean.py                # Cleaning logic for data quality
+│   │   ├── no_influence.py         # Outlier calculation without influence
+│   │   ├── with_influence.py       # Outlier estimation with influence
+│   │   ├── clean.py                # Outlier removal and summary for data quality
+│   │   └── compare.py              # Outlier analysis for data quality
 │   ├── fairness/
 │   │   ├── no_influence.py         # Fairness metrics (no influence)
 │   │   ├── with_influence.py       # Fairness + influence debugging

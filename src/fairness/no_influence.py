@@ -14,24 +14,44 @@ import os, sys
 SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, SRC)
 
-# group_train, is the training part of the column we want to compare. (e.g. "education")
-# possitive_group is the group inside the column that we want to analyse. (e.g. "HS-grad")
 def compute_fairness_influence_metrics(df, class_col, positive_group, d_tol=0.2):
     """
-    Compute group-level influence fairness metrics using Cohen's d effect size,
-    supporting both discrete labels and interval-based groups.
+    Compute group‐level fairness metrics based on influence scores using Cohen’s d.
 
-    Parameters:
-    - df: pandas.DataFrame containing 'influence' and the class_col.
-    - class_col: name of the column in df holding the group labels or intervals.
-    - positive_group: subgroup value to evaluate; may be a label, a pd.Interval,
-                      or an interval string like "(low, high]".
-    - d_tol: Cohen's d threshold below which groups are considered fair.
+    This function supports both discrete class labels and interval‐based groups
+    (e.g., pd.Interval or an interval string like "(low, high]"). It calculates
+    the mean influence for the specified positive group versus the rest, the
+    difference of means, and Cohen’s d effect size. Two fairness flags are set:
+    one based on a relative‐difference tolerance (mean difference / mean_other)
+    and one based on the Cohen’s d threshold.
+
+    Args:
+        df (pd.DataFrame):
+            DataFrame containing at least the 'influence' column and the
+            column specified by `class_col`.
+        class_col (str):
+            Name of the column in `df` holding group labels or numeric values
+            to be binned via interval logic.
+        positive_group (str | pd.Interval):
+            The subgroup to evaluate. May be:
+            - A discrete label matching values in `class_col`
+            - A pandas Interval instance
+            - A string in interval notation, e.g. "(0.0, 1.0]"
+        d_tol (float, optional):
+            Maximum absolute Cohen’s d for which the group is considered fair
+            (default: 0.2).
 
     Returns:
-    - dict with:
-        'group_col', 'positive_group', 'mean_positive_group', 'mean_other',
-        'Inf_mean_diff', 'cohen_d', 'Inf_fair', 'Cohen_fair'
+        dict:
+            A dictionary containing:
+            - 'group_col':        the name of `class_col`
+            - 'positive_group':   the provided `positive_group` value
+            - 'mean_positive_group': mean influence of the positive subgroup
+            - 'mean_other':       mean influence of the complement subgroup
+            - 'Inf_mean_diff':    difference of subgroup means (mean_pos − mean_other)
+            - 'cohen_d':          Cohen’s d effect size
+            - 'Inf_fair':         bool flag if |mean difference / mean_other| ≤ 3
+            - 'Cohen_fair':       bool flag if |Cohen’s d| ≤ d_tol
     """
     influences = df['influence']
     groups = df[class_col]
@@ -96,7 +116,41 @@ def compute_fairness_classical_metrics(
     eod_tol=0.1,
     ppv_tol=0.1,
 ):
+    """
+    Compute classical fairness metrics (DPD, EOD, PPV) for a trained classifier.
 
+    Args:
+        X_test (pd.DataFrame or np.ndarray):
+            Features for the test set.
+        y_test (pd.Series or np.ndarray):
+            True labels for the test set.
+        s_test_df (pd.DataFrame):
+            DataFrame containing sensitive attributes for the test set.
+        sens_cols (list[str]):
+            Column names in `s_test_df` to evaluate (e.g., ["race", "gender"]).
+        model:
+            A trained classifier with a `.predict()` method.
+        dpd_tol (float):
+            Tolerance threshold for Demographic Parity Difference.
+        eod_tol (float):
+            Tolerance threshold for Equalized Odds Difference.
+        ppv_tol (float):
+            Tolerance threshold for Predictive-Value Parity gap.
+
+    Returns:
+        list[dict]:
+            A list of records, one per sensitive feature, each containing:
+            - "sensitive_feature": feature name
+            - "DPD": demographic parity difference
+            - "DPD_fair": whether |DPD| ≤ dpd_tol
+            - "EOD": equalized odds difference
+            - "EOD_fair": whether |EOD| ≤ eod_tol
+            - "PPV_diff": precision gap between best and worst groups
+            - "PPV_fair": whether |PPV_diff| ≤ ppv_tol
+            - "PPV_by_group": dict of per-group precision scores
+            - "PPV_group_fairness": dict of per-group flags indicating
+              whether each group's precision is within `ppv_tol` of the best group.
+    """
     y_pred = model.predict(X_test)
 
     # Get DPD and EOD per sensitive column. Then get PPV for each category inside the columns.
