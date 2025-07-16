@@ -54,8 +54,8 @@ fairfluence/
 │   │   ├── registry.py             # Model registry or config-driven loader
 │   │   ├── train.py                # Model training
 │   ├── influence/                  # Influence score computation
-│   │   ├── base.py                 #
-│   │   ├── logistic_influence.py   #
+│   │   ├── base.py                 # Base class `InfluenceFunctionBase` (abstract)
+│   │   ├── logistic_influence.py   # Concrete implementations for logistic and SVM models
 │   ├── quality/
 │   │   ├── no_influence.py         # Outlier calculation without influence
 │   │   ├── with_influence.py       # Outlier estimation with influence
