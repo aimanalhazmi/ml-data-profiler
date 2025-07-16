@@ -4,27 +4,62 @@ import numpy as np
 
 
 def generate_multi_patterns(df, max_predicates=2, bin_numerical=True, bins=3):
+    """
+    Generate multi-predicate patterns by combining simple feature-value conditions.
+    
+    Creates conjunctions of simple patterns (feature-value pairs) up to a specified 
+    maximum number of predicates. Handles conflicts where multiple values are specified 
+    for the same feature.
+    
+    Args:
+        df: DataFrame containing the data
+        max_predicates: Maximum number of conditions to combine (default: 2)
+        bin_numerical: Whether to bin numerical features (default: True)
+        bins: Number of bins for numerical features (default: 3)
+        
+    Returns:
+        List of dictionaries representing multi-predicate patterns
+    """
+    # First generate all simple patterns (single feature-value pairs)
     simple_patterns = generate_simple_patterns(df, bin_numerical, bins)
     patterns = []
-
+    
+    # Generate combinations of different sizes (from 1 to max_predicates)
     for r in range(1, max_predicates + 1):
         for combo in combinations(simple_patterns, r):
             merged = {}
             conflict = False
+
+            # Merge all predicates in the combination
             for p in combo:
                 for k, v in p.items():
+                    # Check for conflicting values for same feature
                     if k in merged and merged[k] != v:
                         conflict = True
                         break
                     merged[k] = v
                 if conflict:
                     break
+            # Add only conflict-free patterns
             if not conflict:
                 patterns.append(merged)
     return patterns
 
 
 def generate_simple_patterns(df, target_col, bin_numerical=True, bins=3):
+    """
+    Generate all possible simple patterns (single feature-value conditions).
+    
+    For numerical features, bins them into quantile-based intervals when requested.
+    
+    Args:
+        df: DataFrame containing the data
+        bin_numerical: Whether to bin numerical features (default: True)
+        bins: Number of bins for numerical features (default: 3)
+        
+    Returns:
+        List of dictionaries representing single-feature patterns
+    """
     ignore_columns = ['influence', target_col]
     patterns = []
     feature_cols = [c for c in df.columns if c not in ignore_columns]
@@ -41,6 +76,17 @@ def generate_simple_patterns(df, target_col, bin_numerical=True, bins=3):
 
 
 def pattern_support(df, pattern):
+    """
+    Calculate the support for a given pattern in the dataset.
+    
+    Args:
+        df: DataFrame containing the data
+        pattern: Dictionary of feature-value conditions
+        
+    Returns:
+        subset: DataFrame rows matching the pattern
+        support_ratio: Fraction of dataset matching the pattern
+    """
     mask = np.ones(len(df), dtype=bool)
     for col, val in pattern.items():
         if isinstance(val, pd.Interval):
@@ -51,7 +97,22 @@ def pattern_support(df, pattern):
 
 
 def evaluate_patterns(df, target_col, min_support=0.01, top_k=5, max_predicates=1):
-    """top-k interestingness single/multi pattern"""
+    """
+    Evaluate and rank patterns by their interestingness score.
+    
+    Interestingness = Responsibility / Support
+    Responsibility = Sum(influence) of matching rows / Total absolute influence
+    
+    Args:
+        df: DataFrame with 'influence' column and features
+        target_col: Target column name (unused in current implementation)
+        min_support: Minimum support threshold (default: 0.01)
+        top_k: Number of top patterns to return (default: 5)
+        max_predicates: Maximum predicates in patterns (default: 1)
+        
+    Returns:
+        DataFrame with top_k patterns and their metrics
+    """
     if max_predicates == 1:
         patterns = generate_simple_patterns(df, target_col)
     else:
